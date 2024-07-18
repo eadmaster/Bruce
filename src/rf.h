@@ -16,3 +16,4 @@ const int PCA9554TRX_PIN = 0;
 void rf_spectrum();
 void rf_jammerIntermittent();
 void rf_jammerFull();
+void otherRFcodes();

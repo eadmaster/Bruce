@@ -85,7 +85,6 @@ void rf_spectrum() { //@IncursioHack - https://github.com/IncursioHack ----thank
     delay(10);
 
 
-
 }
 
 
@@ -149,3 +148,206 @@ void rf_jammerIntermittent() { //@IncursioHack - https://github.com/IncursioHack
 
     digitalWrite(RfTx, LOW); // Desativa o pino
 }
+
+
+
+#include <RCSwitch.h>
+
+// ported from https://github.com/sui77/rc-switch/blob/3a536a172ab752f3c7a58d831c5075ca24fd920b/RCSwitch.cpp
+void RCSwitch_RAW_send(int nTransmitterPin, unsigned int * ptrtransmittimings, int nRepeatTransmit=1) {
+  if (nTransmitterPin == -1)
+    return;
+
+  if (!ptrtransmittimings)
+    return;
+
+  for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
+    unsigned int currenttiming = 0;
+    bool currentlogiclevel = true;  // start with high state
+    while( ptrtransmittimings[currenttiming] && currenttiming < RCSWITCH_MAX_CHANGES ) {
+      digitalWrite(nTransmitterPin, currentlogiclevel ? HIGH : LOW);
+      delayMicroseconds( ptrtransmittimings[currenttiming] );
+      currenttiming++;
+      currentlogiclevel = !currentlogiclevel;  // toggle
+    }
+  digitalWrite(nTransmitterPin, LOW);
+  }
+}
+
+
+void sendRawRfCommand(String data, uint32_t frequency, String preset, String protocol) { 
+    Serial.println("sendRawRfCommand");
+    Serial.println(data);
+    Serial.println(frequency);
+    Serial.println(preset);
+    Serial.println(protocol);
+    
+    if(frequency != 433920000) {
+        Serial.print("unsupported frequency: ");
+        Serial.println(frequency);
+        return;
+    }
+    // MEMO: frequency is fixed with some transmitters https://github.com/sui77/rc-switch/issues/256
+    // TODO: add frequency switching via CC1101  https://github.com/LSatan/SmartRC-CC1101-Driver-Lib
+    
+    if(! (preset.startsWith("FuriHalSubGhzPresetOok") || preset.startsWith("FuriHalSubGhzPresetCustom"))) {
+        // only ASK/OOK is supported
+        Serial.print("unsupported preset: ");
+        Serial.println(preset);
+        return;
+    }
+    /*  supported flipper presets:
+         FuriHalSubGhzPresetIDLE, // < default configuration 
+        FuriHalSubGhzPresetOok270Async, ///< OOK, bandwidth 270kHz, asynchronous 
+        FuriHalSubGhzPresetOok650Async, ///< OOK, bandwidth 650kHz, asynchronous 
+        FuriHalSubGhzPreset2FSKDev238Async, //< FM, deviation 2.380371 kHz, asynchronous 
+        FuriHalSubGhzPreset2FSKDev476Async, //< FM, deviation 47.60742 kHz, asynchronous 
+        FuriHalSubGhzPresetMSK99_97KbAsync, //< MSK, deviation 47.60742 kHz, 99.97Kb/s, asynchronous 
+        FuriHalSubGhzPresetGFSK9_99KbAsync, //< GFSK, deviation 19.042969 kHz, 9.996Kb/s, asynchronous 
+        FuriHalSubGhzPresetCustom, //Custom Preset
+    */
+    
+    if(protocol != "RAW") {
+        Serial.print("unsupported protocol: ");
+        Serial.println(protocol);
+        return;
+    }
+    
+    digitalWrite(RfTx, LED_OFF);
+    
+    if(RfTx==0) RfTx=GROVE_SDA; // quick fix
+    pinMode(RfTx, OUTPUT);
+    //Serial.println(RfTx);
+    
+    //RCSwitch mySwitch = RCSwitch();
+    //mySwitch.enableTransmit(RfTx);
+    
+    //mySwitch.setProtocol(1);
+    //mySwitch.setPulseLength(pulse);
+    //mySwitch.setRepeatTransmit(10);
+    
+    // alloc buffer for transmittimings
+    unsigned int * transmittimings  = (unsigned int *) calloc(sizeof(int), data.length());  // should be smaller the data.length() 
+    size_t transmittimings_idx = 0;
+    
+    // split data into words, convert to int, and store them in transmittimings
+    String curr_word = "";
+    int curr_val = 0;
+    for(int i=0; i<data.length(); i++) {
+        if(isspace(data[i])) {
+            if(curr_word == "") continue;  // skip if empty
+            // else append to transmittimings
+            //transmittimings[transmittimings_idx] = curr_word.toInt();  // does not handle negative numbers
+            curr_val = atoi(curr_word.c_str());
+            if(curr_val < 0)
+                transmittimings[transmittimings_idx] = (-1) * curr_val;  // invert sign
+            else
+                transmittimings[transmittimings_idx] = curr_val;
+                
+            Serial.println(curr_word);
+            Serial.println(transmittimings[transmittimings_idx]);
+            
+            transmittimings_idx += 1;
+            //if(transmittimings[transmittimings_idx]==0)  invalid int?
+            curr_word = "";  // reset
+            
+        } else {
+            curr_word += data[i];  // append to current word
+        }
+    }
+    transmittimings[transmittimings_idx] = 0;  // termination
+      
+    // send rf command
+    displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
+    //mySwitch.send(transmittimings);
+    RCSwitch_RAW_send(RfTx, transmittimings);
+    free(transmittimings);
+    
+    Serial.println("finished sending");
+    
+    digitalWrite(RfTx, LED_OFF);
+}
+
+
+struct RfCodes {
+  uint32_t frequency;
+  String protocol;
+  String preset;
+  String data;
+};
+
+RfCodes rfcodes[50];
+
+void resetRFCodesArray() {
+  for (int i = 0; i < 25; i++) {
+    rfcodes[i].frequency = 0;
+    rfcodes[i].preset = "";
+    rfcodes[i].protocol = "";
+    rfcodes[i].data = "";
+  }
+}
+
+void otherRFcodes() {
+  resetRFCodesArray();
+  int total_codes = 0;
+  String filepath;
+  File databaseFile;
+  FS *fs;
+  if(setupSdCard()) {
+    bool teste=false;
+    options = {
+      {"SD Card", [&]()  { fs=&SD; }},
+      {"LittleFS", [&]()   { fs=&LittleFS; }},
+    };
+    delay(200);
+    loopOptions(options);
+    delay(200);
+
+  } else fs=&LittleFS;
+
+  filepath = loopSD(*fs, true);
+  databaseFile = fs->open(filepath, FILE_READ);
+  drawMainBorder();
+  //pinMode(IrTx, OUTPUT);
+  //digitalWrite(IrTx, LED_ON);
+
+  if (!databaseFile) {
+    Serial.println("Failed to open database file.");
+    displayError("Fail to open file");
+    delay(2000);
+    return;
+  }
+  Serial.println("Opened sub file.");
+  
+  // format specs: https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/file_formats/SubGhzFileFormats.md
+
+  String line;
+    String txt;
+    while (databaseFile.available() && total_codes<50) {
+      line = databaseFile.readStringUntil('\n');
+      txt=line.substring(line.indexOf(":") + 1);
+      txt.trim();
+      if(line.startsWith("Protocol:"))  rfcodes[total_codes].protocol = txt;
+      if(line.startsWith("Preset:"))   rfcodes[total_codes].preset = txt;
+      if(line.startsWith("Frequency:")) rfcodes[total_codes].frequency = txt.toInt();
+      if(line.startsWith("RAW_Data:") || line.startsWith("Key:")) {    rfcodes[total_codes].data += txt;  total_codes++; }
+    }
+    options = { };
+    bool exit = false;
+    for(int i=0; i<=total_codes; i++) {  // remove loop: cannot have more than 1 cmd per file?
+      if(rfcodes[i].protocol=="RAW") options.push_back({ "Send cmd", [=](){ sendRawRfCommand(rfcodes[i].data, rfcodes[i].frequency, rfcodes[i].preset, rfcodes[i].protocol ); }});
+    }
+    options.push_back({ "Main Menu" , [&](){ exit=true; }});
+    databaseFile.close();
+    
+    while (1) {
+      delay(200);
+      loopOptions(options);
+      if(checkEscPress() || exit) break;
+      delay(200);
+    }
+
+  resetRFCodesArray();
+  digitalWrite(RfTx, LED_OFF);
+}
+

@@ -163,7 +163,7 @@ void setup() {
   // If M5 or Enter button is pressed, continue from here
   Program:
   delay(200);
-
+  
 }
 
 /**********************************************************************
@@ -177,6 +177,7 @@ void loop() {
   tft.fillRect(0,0,WIDTH,HEIGHT,BGCOLOR);
   while(1){
     handleSerialCommands();
+    // TODO: screenSleep(); // turn off screen  with a timer -> wake up on any button press
     
     if(returnToMenu) {
       returnToMenu = false;
@@ -249,6 +250,7 @@ void loop() {
           options = {
             //{"Scan/copy", [=]()   { displayRedStripe("Scan/Copy"); }},
             //{"Replay", [=]()      { displayRedStripe("Replay"); }},
+            {"Custom SubGhz", [=]() { otherRFcodes(); }},
             {"Spectrum", [=]()            { rf_spectrum(); }}, //@IncursioHack
             {"Jammer Itmt", [=]() { rf_jammerIntermittent(); }}, //@IncursioHack
             {"Jammer Full", [=]()         { rf_jammerFull(); }}, //@IncursioHack
