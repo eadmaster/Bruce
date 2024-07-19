@@ -10,6 +10,8 @@
 #include <ESP8266Audio.h>
 #include <ESP8266SAM.h>
 #include "sd_functions.h"
+#include "settings.h"
+#include "display.h"
 
 
 void SerialPrintHexString(uint64_t val) {
@@ -219,7 +221,7 @@ void handleSerialCommands() {
           source = new AudioFileSourcePROGMEM( song.c_str(), song.length() );
         } else if(song.indexOf(".") != -1) {
           // try to open "song" as a file
-          // e.g. music_player music/Axel-F.txt
+          // e.g. music_player audio/Axel-F.txt
           if(!song.startsWith("/")) song = "/" + song;  // add "/" if missing
           // try opening on SD
           //if(setupSdCard()) source = new AudioFileSourceFS(SD, song.c_str());
@@ -236,21 +238,25 @@ void handleSerialCommands() {
             // switch on extension
             song.toLowerCase(); // case-insensitive match
             if(song.endsWith(".txt") || song.endsWith(".rtttl"))  generator = new AudioGeneratorRTTTL();
-            /*
+            /* 2FIX: compilation issues
             if(song.endsWith(".mid"))  {
               // need to load a soundfont
               AudioFileSource* sf2 = NULL;
-              if(setupSdCard()) sf2 = new AudioFileSourceFS(SD, "1mgm.sf2");  // TODO: make configurable
-              if(!sf2) sf2 = new AudioFileSourceFS(LittleFS, "1mgm.sf2");  // TODO: make configurable
+              if(setupSdCard()) sf2 = new AudioFileSourceSD("audio/1mgm.sf2");  // TODO: make configurable
+              if(!sf2) sf2 = new AudioFileSourceLittleFS("audio/1mgm.sf2");  // TODO: make configurable
               if(sf2) {
                 // a soundfount was found
-                generator = new AudioGeneratorMIDI();
+                AudioGeneratorMIDI* midi = new AudioGeneratorMIDI();
                 generator->SetSoundfont(sf2);
+                generator = midi;
               }
             }*/
             if(song.endsWith(".wav"))  generator = new AudioGeneratorWAV();
             if(song.endsWith(".mod"))  generator = new AudioGeneratorMOD();
-            if(song.endsWith(".mp3"))  generator = new AudioGeneratorMP3();
+            if(song.endsWith(".mp3")) {
+                generator = new AudioGeneratorMP3();
+                source = new AudioFileSourceID3(source);
+            }
             if(song.endsWith(".opus"))  generator = new AudioGeneratorOpus();
             // TODO: more formats
           }
@@ -266,7 +272,10 @@ void handleSerialCommands() {
       }*/
       
       //TODO: tone
-      // https://github.com/earlephilhower/ESP8266Audio/blob/master/examples/PlayWAVFromFunction/PlayWAVFromFunction.ino
+      // https://github.com/earlephilhower/ESP8266Audio/issues/643
+
+      //TODO: webradio
+      // https://github.com/earlephilhower/ESP8266Audio/tree/master/examples/WebRadio
 
       if(cmd_str.startsWith("tts " ) || cmd_str.startsWith("say " )) {
         // https://github.com/earlephilhower/ESP8266SAM/blob/master/examples/Speak/Speak.ino
@@ -292,6 +301,18 @@ void handleSerialCommands() {
   // https://github.com/earlephilhower/ESP8266Audio/issues/70
   // https://github.com/earlephilhower/ESP8266Audio/pull/118
 
+  if(cmd_str.startsWith("lcd " ) || cmd_str.startsWith("tft" ) ) {
+    String new_status = cmd_str.substring(strlen("lcd "), cmd_str.length());
+    if(new_status=="off") {
+      analogWrite(BACKLIGHT, 0);
+      esp_timer_stop(screensaver_timer);
+    } else if(new_status=="on") {
+      getBrightness();  // reinit brightness
+      reset_screensaver_timer();
+    }
+    return;
+  }
+    
   Serial.println("unsupported serial command: " + cmd_str);
 
 

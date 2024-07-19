@@ -119,7 +119,8 @@ void setup() {
   #if defined(BACKLIGHT)
   pinMode(BACKLIGHT, OUTPUT);
   #endif
-
+  
+  init_screensaver_timer();
   getBrightness();
   gsetIrTxPin();
   gsetIrRxPin();
@@ -184,13 +185,14 @@ void loop() {
       tft.fillScreen(BGCOLOR); //fix any problem with the mainMenu screen when coming back from submenus or functions
       redraw=true;
     }
-
+    
     if (redraw) {
+      reset_screensaver_timer();
       drawMainMenu(index);
       redraw = false;
       delay(200);
     }
-
+    
     if(checkPrevPress()) {
       if(index==0) index = opt - 1;
       else if(index>0) index--;

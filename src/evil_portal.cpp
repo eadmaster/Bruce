@@ -119,6 +119,7 @@ void startEvilPortal(String tssid, uint8_t channel, bool deauth) {
     redraw=true;
     while(1) {
       if(redraw) {
+        reset_screensaver_timer();
         drawMainBorder();
         
         tft.setTextSize(FM);

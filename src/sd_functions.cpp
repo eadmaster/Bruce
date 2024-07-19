@@ -392,6 +392,7 @@ String loopSD(FS &fs, bool filePicker) {
     if(returnToMenu) break; // stop this loop and retur to the previous loop
 
     if(redraw) { 
+      reset_screensaver_timer();
       if(strcmp(PreFolder.c_str(),Folder.c_str()) != 0 || reload){
         index=0;
         readFs(fs, Folder, fileList);

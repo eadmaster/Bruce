@@ -6,6 +6,14 @@
 
 void initDisplay(int i = 0); // Início da função e mostra bootscreen
 
+
+#include "esp_timer.h"
+const int SCREENSAVER_TIMEOUT_IN_SECONDS = 60;
+extern  esp_timer_handle_t screensaver_timer;
+void init_screensaver_timer();
+void reset_screensaver_timer();
+
+  
 //Funções para economizar linhas nas outras funções
 void resetTftDisplay(int x = 0, int y = 0, uint16_t fc = FGCOLOR, int size = FM, uint16_t bg = BGCOLOR, uint16_t screen = BGCOLOR);
 void setTftDisplay(int x = 0, int y = 0, uint16_t fc = tft.textcolor, int size = tft.textsize, uint16_t bg = tft.textbgcolor);

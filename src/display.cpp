@@ -76,6 +76,7 @@ void loopOptions(const std::vector<std::pair<std::string, std::function<void()>>
   int index = 0;
   while(1){
     if (redraw) { 
+      reset_screensaver_timer();
       if(submenu) drawSubmenu(index, options, subText);
       else drawOptions(index, options, FGCOLOR, BGCOLOR);
       if(bright){
@@ -489,3 +490,40 @@ void drawOther(int x, int y) {
   tft.drawArc(40+x,40+y,32,29,240,360,FGCOLOR,BGCOLOR);
 }
 
+
+esp_timer_handle_t screensaver_timer;
+
+static void screensaver_timer_callback(void* arg) {
+  // turn off TFT backlight
+  analogWrite(BACKLIGHT, 0);
+  // TODO: add an option to show a big clock instead
+}
+
+void init_screensaver_timer() {
+  // setup screensaver timer
+    const esp_timer_create_args_t screensaver_timer_args = {
+			.callback = &screensaver_timer_callback,
+			/* argument specified here will be passed to timer callback function */
+			.arg = (void*) screensaver_timer,
+			/* name is optional, but may help identify the timer when debugging */
+			.name = "screensaver"
+	};
+  esp_timer_create(&screensaver_timer_args, &screensaver_timer);
+  esp_timer_start_once(screensaver_timer, 1000000 * SCREENSAVER_TIMEOUT_IN_SECONDS);  //  timer timeout, in microseconds relative to the current moment
+
+}
+
+void reset_screensaver_timer() {
+    // if a key was pressed in prev loop
+    if(esp_timer_is_active(screensaver_timer)) {
+        // screen is already on, reset the screensaver timer
+       //MISSING IN OLD SDK: esp_timer_restart(screensaver_timer, 1000000 * SCREENSAVER_TIMEOUT_IN_SECONDS) // Restart a currently running timer.
+       esp_timer_stop(screensaver_timer);
+    } else {
+        // screen is off, reinit brightness
+        getBrightness();
+    }
+    //else  
+    esp_timer_start_once(screensaver_timer, 1000000 * SCREENSAVER_TIMEOUT_IN_SECONDS);  // restart a stopped/not running timer
+
+}
