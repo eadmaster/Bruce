@@ -7,7 +7,9 @@
 #include "cJSON.h"
 #include <inttypes.h> // for PRIu64
 #include <RCSwitch.h>
-
+#include <ESP8266Audio.h>
+#include <ESP8266SAM.h>
+#include "sd_functions.h"
 
 
 void SerialPrintHexString(uint64_t val) {
@@ -133,8 +135,8 @@ void handleSerialCommands() {
     //backToMenu();
     return;
   }  // end of ir commands
-  
-  if(cmd_str.startsWith("rf") ) {
+    
+  if(cmd_str.startsWith("rf") || cmd_str.startsWith("subghz" )) {
     if(RfTx==0) RfTx=GROVE_SDA; // quick fix
     pinMode(RfTx, OUTPUT);
     //Serial.println(RfTx);
@@ -142,6 +144,12 @@ void handleSerialCommands() {
     RCSwitch mySwitch = RCSwitch();
     mySwitch.enableTransmit(RfTx);
     
+    /* WIP:
+    if(cmd_str.startsWith("subghz tx")) {
+      // flipperzero-like cmd  https://docs.flipper.net/development/cli/#wLVht
+      // e.g. subghz tx 0000000000200001 868250000 403 10  // https://forum.flipper.net/t/friedland-libra-48249sl-wireless-doorbell-request/4528/20
+      //                {hex_key} {frequency} {te} {count}
+    }*/
     if(cmd_str.startsWith("rfsend")) {
       // tasmota json command  https://tasmota.github.io/docs/Tasmota-IR/#sending-ir-commands
       // e.g. RfSend {"Data":"0x447503","Bits":24,"Protocol":1,"Pulse":174,"Repeat":10}  // on
@@ -190,9 +198,101 @@ void handleSerialCommands() {
       cJSON_Delete(root);
       return;
     }
-  }
+  }  // endof rf
+  
+  if(cmd_str.startsWith("music_player " ) || cmd_str.startsWith("ttf" ) ) {
+      AudioOutputI2S *audioout = new AudioOutputI2S();  // https://github.com/earlephilhower/ESP8266Audio/blob/master/src/AudioOutputI2S.cpp#L32
+  #ifdef CARDPUTER
+      audioout->SetPinout(41, 43, 42);
+      // TODO: other pinouts
+  #endif
+      AudioGenerator* generator = NULL;
+      AudioFileSource* source = NULL;
+  
+      if(cmd_str.startsWith("music_player " ) ) {  // || cmd_str.startsWith("play " )
+        String song = cmd_str.substring(13, cmd_str.length());
+        if(song.indexOf(":") != -1) {
+          // RTTTL player
+          // music_player mario:d=4,o=5,b=100:16e6,16e6,32p,8e6,16c6,8e6,8g6,8p,8g,8p,8c6,16p,8g,16p,8e,16p,8a,8b,16a#,8a,16g.,16e6,16g6,8a6,16f6,8g6,8e6,16c6,16d6,8b,16p,8c6,16p,8g,16p,8e,16p,8a,8b,16a#,8a,16g.,16e6,16g6,8a6,16f6,8g6,8e6,16c6,16d6,8b,8p,16g6,16f#6,16f6,16d#6,16p,16e6,16p,16g#,16a,16c6,16p,16a,16c6,16d6,8p,16g6,16f#6,16f6,16d#6,16p,16e6,16p,16c7,16p,16c7,16c7,p,16g6,16f#6,16f6,16d#6,16p,16e6,16p,16g#,16a,16c6,16p,16a,16c6,16d6,8p,16d#6,8p,16d6,8p,16c6
+          // derived from https://github.com/earlephilhower/ESP8266Audio/blob/master/examples/PlayRTTTLToI2SDAC/PlayRTTTLToI2SDAC.ino
+          generator = new AudioGeneratorRTTTL();
+          source = new AudioFileSourcePROGMEM( song.c_str(), song.length() );
+        } else if(song.indexOf(".") != -1) {
+          // try to open "song" as a file
+          // e.g. music_player music/Axel-F.txt
+          if(!song.startsWith("/")) song = "/" + song;  // add "/" if missing
+          // try opening on SD
+          //if(setupSdCard()) source = new AudioFileSourceFS(SD, song.c_str());
+          if(setupSdCard()) source = new AudioFileSourceSD(song.c_str());
+          // try opening on LittleFS
+          //if(!source) source = new AudioFileSourceFS(LittleFS, song.c_str());
+          if(!source) source = new AudioFileSourceLittleFS(song.c_str());
+          if(!source) {
+            Serial.print("audio file not found: ");
+            Serial.println(song);
+            return;
+          }
+          if(source){
+            // switch on extension
+            song.toLowerCase(); // case-insensitive match
+            if(song.endsWith(".txt") || song.endsWith(".rtttl"))  generator = new AudioGeneratorRTTTL();
+            /*
+            if(song.endsWith(".mid"))  {
+              // need to load a soundfont
+              AudioFileSource* sf2 = NULL;
+              if(setupSdCard()) sf2 = new AudioFileSourceFS(SD, "1mgm.sf2");  // TODO: make configurable
+              if(!sf2) sf2 = new AudioFileSourceFS(LittleFS, "1mgm.sf2");  // TODO: make configurable
+              if(sf2) {
+                // a soundfount was found
+                generator = new AudioGeneratorMIDI();
+                generator->SetSoundfont(sf2);
+              }
+            }*/
+            if(song.endsWith(".wav"))  generator = new AudioGeneratorWAV();
+            if(song.endsWith(".mod"))  generator = new AudioGeneratorMOD();
+            if(song.endsWith(".mp3"))  generator = new AudioGeneratorMP3();
+            if(song.endsWith(".opus"))  generator = new AudioGeneratorOpus();
+            // TODO: more formats
+          }
+        }
+      }
 
-  Serial.println("unsupported serial command" + cmd_str);
+      /*if(cmd_str.startsWith("talkie " )) {
+          // https://github.com/earlephilhower/ESP8266Audio/blob/c9faa3cf070248d43b2ed7d1465f56c489cc8276/examples/TalkingClockI2S/TalkingClockI2S.ino
+          generator = new AudioGeneratorTalkie();
+          talkie->begin(nullptr, audioout);
+          String say_str = cmd_str.substring(4, cmd_str.length());
+          talkie->say(spTHE, sizeof(spTHE));
+      }*/
+      
+      //TODO: tone
+      // https://github.com/earlephilhower/ESP8266Audio/blob/master/examples/PlayWAVFromFunction/PlayWAVFromFunction.ino
+
+      if(cmd_str.startsWith("tts " ) || cmd_str.startsWith("say " )) {
+        // https://github.com/earlephilhower/ESP8266SAM/blob/master/examples/Speak/Speak.ino
+        audioout->begin();
+        ESP8266SAM *sam = new ESP8266SAM;
+        sam->Say(audioout, cmd_str.c_str() + strlen("tts "));
+        delete sam;
+        return;
+      }
+      
+      if(generator && source && audioout) {
+        generator->begin(source, audioout);
+        // TODO async play
+        while (generator->isRunning()) {
+          if (!generator->loop()) generator->stop();
+        }
+        delete generator; delete source, delete audioout;
+        return;
+      }
+    }  // end of music_player
+
+  // WIP: record | mic
+  // https://github.com/earlephilhower/ESP8266Audio/issues/70
+  // https://github.com/earlephilhower/ESP8266Audio/pull/118
+
+  Serial.println("unsupported serial command: " + cmd_str);
 
 
 }
