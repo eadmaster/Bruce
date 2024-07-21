@@ -6,12 +6,13 @@
 #include "TV-B-Gone.h"
 #include "cJSON.h"
 #include <inttypes.h> // for PRIu64
-#include <RCSwitch.h>
+
 #include <ESP8266Audio.h>
 #include <ESP8266SAM.h>
 #include "sd_functions.h"
 #include "settings.h"
 #include "display.h"
+#include "rf.h"
 
 
 void SerialPrintHexString(uint64_t val) {
@@ -142,10 +143,7 @@ void handleSerialCommands() {
     if(RfTx==0) RfTx=GROVE_SDA; // quick fix
     pinMode(RfTx, OUTPUT);
     //Serial.println(RfTx);
-    
-    RCSwitch mySwitch = RCSwitch();
-    mySwitch.enableTransmit(RfTx);
-    
+        
     /* WIP:
     if(cmd_str.startsWith("subghz tx")) {
       // flipperzero-like cmd  https://docs.flipper.net/development/cli/#wLVht
@@ -182,6 +180,7 @@ void handleSerialCommands() {
         dataStr = dataItem->valuestring;
       } else {
         Serial.println("missing or invalid data to send");
+        cJSON_Delete(root);
         return;      
       }
       //String dataStr = cmd_str.substring(36, 36+8);
@@ -190,12 +189,7 @@ void handleSerialCommands() {
       //SerialPrintHexString(data);
       //Serial.println(bits);
       
-      mySwitch.setProtocol(protocol);
-      if (pulse) { mySwitch.setPulseLength(pulse); }
-      mySwitch.setPulseLength(pulse);
-      mySwitch.setRepeatTransmit(repeat);
-      
-      mySwitch.send(data, bits);
+      RCSwitch_send(data, bits, pulse, protocol, repeat);
       
       cJSON_Delete(root);
       return;
@@ -203,6 +197,7 @@ void handleSerialCommands() {
   }  // endof rf
   
   if(cmd_str.startsWith("music_player " ) || cmd_str.startsWith("ttf" ) ) {
+    // TODO: move in audio.cpp module
       AudioOutputI2S *audioout = new AudioOutputI2S();  // https://github.com/earlephilhower/ESP8266Audio/blob/master/src/AudioOutputI2S.cpp#L32
   #ifdef CARDPUTER
       audioout->SetPinout(41, 43, 42);
@@ -311,6 +306,12 @@ void handleSerialCommands() {
       reset_screensaver_timer();
     }
     return;
+  }
+  
+  if(cmd_str == "clock" ) {
+      esp_timer_stop(screensaver_timer);  // disable screensaver while the clock is running
+      runClockLoop();
+      return;
   }
     
   Serial.println("unsupported serial command: " + cmd_str);

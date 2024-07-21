@@ -155,14 +155,40 @@ struct RfCodes {
   String protocol = "";
   String preset = "";
   String data = "";
+  int te = 0;
   String filepath = "";
 };
 
 
 #include <RCSwitch.h>
 
+void RCSwitch_send(uint64_t data, unsigned int bits, int pulse, int protocol, int repeat)
+{
+      RCSwitch mySwitch = RCSwitch();
+      mySwitch.enableTransmit(RfTx);
+      mySwitch.setProtocol(protocol);
+      if (pulse) { mySwitch.setPulseLength(pulse); }
+      mySwitch.setPulseLength(pulse);
+      mySwitch.setRepeatTransmit(repeat);
+      mySwitch.send(data, bits);
+}
+
+struct HighLow {
+    uint8_t high; // 1
+    uint8_t low;  //31
+};
+
+struct Protocol {
+    uint16_t pulseLength;  // base pulse length in microseconds, e.g. 350
+    HighLow syncFactor;
+    HighLow zero;
+    HighLow one;
+    bool invertedSignal;
+};
+
 // ported from https://github.com/sui77/rc-switch/blob/3a536a172ab752f3c7a58d831c5075ca24fd920b/RCSwitch.cpp
-void RCSwitch_RAW_send(int nTransmitterPin, int * ptrtransmittimings, int nRepeatTransmit=1) {
+
+void RCSwitch_RAW_send(int nTransmitterPin, int * ptrtransmittimings, struct Protocol protocol) {
   if (nTransmitterPin == -1)
     return;
 
@@ -170,19 +196,39 @@ void RCSwitch_RAW_send(int nTransmitterPin, int * ptrtransmittimings, int nRepea
     return;
 
   bool currentlogiclevel = true;
+  int nRepeatTransmit = 1;
+  //HighLow pulses ;
   
   for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
     unsigned int currenttiming = 0;
-    while( ptrtransmittimings[currenttiming] && currenttiming < RCSWITCH_MAX_CHANGES ) {
+    while( ptrtransmittimings[currenttiming] ) {  // && currenttiming < RCSWITCH_MAX_CHANGES 
         if(ptrtransmittimings[currenttiming] >= 0) {
             currentlogiclevel = true;
+            //pulses = protocol.one;
         } else {
             // negative value
             currentlogiclevel = false;
             ptrtransmittimings[currenttiming] = (-1) * ptrtransmittimings[currenttiming];  // invert sign
+            //pulses = protocol.zero;
         }
+      
       digitalWrite(nTransmitterPin, currentlogiclevel ? HIGH : LOW);
       delayMicroseconds( ptrtransmittimings[currenttiming] );
+      
+      /*
+      uint8_t firstLogicLevel = (protocol.invertedSignal) ? LOW : HIGH;
+      uint8_t secondLogicLevel = (protocol.invertedSignal) ? HIGH : LOW;
+      
+      digitalWrite(nTransmitterPin, firstLogicLevel);
+      delayMicroseconds( protocol.pulseLength * pulses.high);
+      digitalWrite(nTransmitterPin, secondLogicLevel);
+      delayMicroseconds( protocol.pulseLength * pulses.low);
+      * */
+      
+      Serial.print(ptrtransmittimings[currenttiming]);
+      Serial.print("=");
+      Serial.println(currentlogiclevel);
+      
       currenttiming++;
     }
   digitalWrite(nTransmitterPin, LOW);
@@ -190,7 +236,7 @@ void RCSwitch_RAW_send(int nTransmitterPin, int * ptrtransmittimings, int nRepea
 }
 
 
-void sendRawRfCommand(struct RfCodes rfcode) { 
+void sendRfCommand(struct RfCodes rfcode) { 
       uint32_t frequency = rfcode.frequency;
       String protocol = rfcode.protocol;
       String preset = rfcode.preset;
@@ -210,8 +256,19 @@ void sendRawRfCommand(struct RfCodes rfcode) {
     // MEMO: frequency is fixed with some transmitters https://github.com/sui77/rc-switch/issues/256
     // TODO: add frequency switching via CC1101  https://github.com/LSatan/SmartRC-CC1101-Driver-Lib
     
-    if(! preset.startsWith("FuriHalSubGhzPresetOok")) {
-        // only ASK/OOK is supported
+    // Radio preset name (configures modulation, bandwidth, filters, etc.).
+    struct Protocol rcswitch_protocol;
+    int rcswitch_protocol_no = 1;
+    if(preset == "FuriHalSubGhzPresetOok270Async") {
+        rcswitch_protocol_no = 1;
+        //  pulseLength , syncFactor , zero , one, invertedSignal
+        rcswitch_protocol = { 350, {  1, 31 }, {  1,  3 }, {  3,  1 }, false };
+    }
+    else if(preset == "FuriHalSubGhzPresetOok650Async") {
+        rcswitch_protocol_no = 2;
+        rcswitch_protocol = { 650, {  1, 10 }, {  1,  2 }, {  2,  1 }, false };
+    }
+    else {
         Serial.print("unsupported preset: ");
         Serial.println(preset);
         return;
@@ -227,59 +284,62 @@ void sendRawRfCommand(struct RfCodes rfcode) {
         FuriHalSubGhzPresetCustom, //Custom Preset
     */
     
-    if(protocol != "RAW") {
+    // init output pin
+    digitalWrite(RfTx, LED_OFF);
+    if(RfTx==0) RfTx=GROVE_SDA; // quick fix
+    pinMode(RfTx, OUTPUT);
+    
+    if(protocol == "RAW") {
+        // alloc buffer for transmittimings
+        int* transmittimings  = (int *) calloc(sizeof(int), data.length());  // should be smaller the data.length() 
+        size_t transmittimings_idx = 0;
+        
+        // split data into words, convert to int, and store them in transmittimings
+        String curr_word = "";
+        int curr_val = 0;
+        for(int i=0; i<data.length(); i++) {
+            if(isspace(data[i])) {
+                if(curr_word == "") continue;  // skip if empty
+                // else append to transmittimings
+                //transmittimings[transmittimings_idx] = curr_word.toInt();  // does not handle negative numbers
+                transmittimings[transmittimings_idx] = atoi(curr_word.c_str());
+                //if(transmittimings[transmittimings_idx]==0)  invalid int?
+                transmittimings_idx += 1;
+                curr_word = "";  // reset
+                
+            } else {
+                curr_word += data[i];  // append to current word
+            }
+        }
+        transmittimings[transmittimings_idx] = 0;  // termination
+          
+        // send rf command
+        displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
+        //mySwitch.send(transmittimings);  // req. forked ver
+        RCSwitch_RAW_send(RfTx, transmittimings, rcswitch_protocol);
+        free(transmittimings);
+    }
+    else if(protocol == "RcSwitch") {
+        data.replace(" ", "");  // remove spaces
+        uint64_t data_val = strtoul(data.c_str(), nullptr, 16);
+        int bits = data.length() * 4;
+        int pulse = rfcode.te;  // not sure about this...
+        int repeat = 10;
+        /*
+        Serial.print("RcSwitch: ");
+        Serial.println(data);
+        Serial.println(bits);
+        Serial.println(pulse);
+        Serial.println(rcswitch_protocol_no);
+        * */
+        displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
+        RCSwitch_send(data_val, bits, pulse, rcswitch_protocol_no, repeat);
+    }
+    else {
         Serial.print("unsupported protocol: ");
         Serial.println(protocol);
         return;
     }
-    
-    digitalWrite(RfTx, LED_OFF);
-    
-    if(RfTx==0) RfTx=GROVE_SDA; // quick fix
-    pinMode(RfTx, OUTPUT);
-    //Serial.println(RfTx);
-    
-    //RCSwitch mySwitch = RCSwitch();
-    //mySwitch.enableTransmit(RfTx);
-    
-    //mySwitch.setProtocol(1);
-    //mySwitch.setPulseLength(pulse);
-    //mySwitch.setRepeatTransmit(10);
-    
-    // alloc buffer for transmittimings
-    int* transmittimings  = (int *) calloc(sizeof(int), data.length());  // should be smaller the data.length() 
-    size_t transmittimings_idx = 0;
-    
-    // split data into words, convert to int, and store them in transmittimings
-    String curr_word = "";
-    int curr_val = 0;
-    for(int i=0; i<data.length(); i++) {
-        if(isspace(data[i])) {
-            if(curr_word == "") continue;  // skip if empty
-            // else append to transmittimings
-            //transmittimings[transmittimings_idx] = curr_word.toInt();  // does not handle negative numbers
-            transmittimings[transmittimings_idx] = atoi(curr_word.c_str());
-            /*
-            Serial.println(curr_word);
-            Serial.println(transmittimings[transmittimings_idx]);
-            */
-            transmittimings_idx += 1;
-            //if(transmittimings[transmittimings_idx]==0)  invalid int?
-            curr_word = "";  // reset
-            
-        } else {
-            curr_word += data[i];  // append to current word
-        }
-    }
-    transmittimings[transmittimings_idx] = 0;  // termination
-      
-    // send rf command
-    displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
-    //mySwitch.send(transmittimings);
-    RCSwitch_RAW_send(RfTx, transmittimings);
-    free(transmittimings);
-    
-    Serial.println("finished sending");
     
     digitalWrite(RfTx, LED_OFF);
 }
@@ -318,7 +378,7 @@ void otherRFcodes() {
   struct RfCodes selected_code ;
   bool recent_menu_selected = false;
     options = {
-      {"Recent", [&]()  { selected_code = selectRecentMenu(); recent_menu_selected = true;}},
+      //WIP: {"Recent", [&]()  { selected_code = selectRecentMenu(); recent_menu_selected = true;}},
       {"LittleFS", [&]()   { fs=&LittleFS; }},
     };
   if(setupSdCard()) options.push_back({"SD Card", [&]()  { fs=&SD; }});    
@@ -328,7 +388,7 @@ void otherRFcodes() {
   delay(200);
   
   if(recent_menu_selected == true) {
-    if(selected_code.filepath!="") sendRawRfCommand(selected_code);  // a code was selected
+    if(selected_code.filepath!="") sendRfCommand(selected_code);  // a code was selected
     return;
     // no need to proceed, go back
   }
@@ -357,12 +417,13 @@ void otherRFcodes() {
       if(line.startsWith("Protocol:"))  selected_code.protocol = txt;
       if(line.startsWith("Preset:"))   selected_code.preset = txt;
       if(line.startsWith("Frequency:")) selected_code.frequency = txt.toInt();
-      if(line.startsWith("RAW_Data:")) { selected_code.data += txt; }
+      if(line.startsWith("TE:")) selected_code.te = txt.toInt();
+      if(line.startsWith("RAW_Data:") || line.startsWith("Key:")) { selected_code.data += txt; }
   }
   databaseFile.close();
     
   addToRecentCodes(selected_code);
-  sendRawRfCommand(selected_code);
+  sendRfCommand(selected_code);
     
   // TODO: menu to resend command/pick another file from the same dir?
 
