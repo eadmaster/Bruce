@@ -59,6 +59,22 @@ bool checkEscPress(){
   else { return false; }
 }
 
+#include "TV-B-Gone.h"
+#include "rf.h"
+#include "webInterface.h"
+
+void checkShortcutPress(){
+  // some shortctus to quickly starts apps
+#if defined (CARDPUTER)
+    Keyboard.update();
+    if(Keyboard.isKeyPressed('i'))  otherIRcodes();
+    if(Keyboard.isKeyPressed('r') || Keyboard.isKeyPressed('s'))  otherRFcodes();
+    if(Keyboard.isKeyPressed('w'))  loopOptionsWebUi();
+// TODO: other boards
+// TODO: user-configurable
+#endif
+}
+
 #ifndef STICK_C
 /* Starts keyboard to type data */
 String keyboard(String mytext, int maxSize, String msg) {
