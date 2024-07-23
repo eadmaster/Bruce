@@ -13,3 +13,5 @@ bool checkSelPress();
 bool checkEscPress();
 
 void checkShortcutPress();
+
+bool checkAnyKeyPress();

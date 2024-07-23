@@ -178,7 +178,6 @@ void loop() {
   tft.fillRect(0,0,WIDTH,HEIGHT,BGCOLOR);
   while(1){
     handleSerialCommands();
-    // TODO: screenSleep(); // turn off screen  with a timer -> wake up on any button press
     
     if(returnToMenu) {
       returnToMenu = false;
@@ -186,8 +185,9 @@ void loop() {
       redraw=true;
     }
     
+    if(checkAnyKeyPress()) reset_screensaver_timer();
+    
     if (redraw) {
-      reset_screensaver_timer();
       drawMainMenu(index);
       redraw = false;
       delay(200);

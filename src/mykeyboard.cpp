@@ -59,8 +59,23 @@ bool checkEscPress(){
   else { return false; }
 }
 
+bool checkAnyKeyPress() {
+#if defined (CARDPUTER)   // If any key is pressed, it'll jump the boot screen
+    Keyboard.update();
+    if(Keyboard.isPressed())
+  #else
+    if(digitalRead(SEL_BTN)==LOW)  // If M5 key is pressed, it'll jump the boot screen
+  #endif
+      return true;
+  // else
+  return false;
+  
+}
+  
+
 #include "TV-B-Gone.h"
 #include "rf.h"
+#include "bad_usb.h"
 #include "webInterface.h"
 
 void checkShortcutPress(){
@@ -69,6 +84,7 @@ void checkShortcutPress(){
     Keyboard.update();
     if(Keyboard.isKeyPressed('i'))  otherIRcodes();
     if(Keyboard.isKeyPressed('r') || Keyboard.isKeyPressed('s'))  otherRFcodes();
+    if(Keyboard.isKeyPressed('b'))  usb_setup();  // badusb
     if(Keyboard.isKeyPressed('w'))  loopOptionsWebUi();
 // TODO: other boards
 // TODO: user-configurable
