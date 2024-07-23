@@ -301,7 +301,7 @@ void sortList(String fileList[][3], int fileListCount) {
 ** Function name: sortList
 ** Description:   sort files for name
 ***************************************************************************************/
-void readFs(FS fs, String folder, String result[][3]) {
+void readFs(FS fs, String folder, String result[][3], String allowed_ext) {
 
     int allFilesCount = 0;
     while(allFilesCount<MAXFILES) {
@@ -330,7 +330,7 @@ void readFs(FS fs, String folder, String result[][3]) {
                 result[allFilesCount][2] = "file";
                 allFilesCount++;
               }
-            else {
+            else if(allowed_ext=="*" || ext==allowed_ext) {
               result[allFilesCount][0] = fileName.substring(fileName.lastIndexOf("/") + 1);
               result[allFilesCount][1] = file2.path();
               result[allFilesCount][2] = "file";
@@ -372,7 +372,7 @@ void readFs(FS fs, String folder, String result[][3]) {
 **  Function: loopSD                          
 **  Where you choose what to do with your SD Files   
 **********************************************************************/
-String loopSD(FS &fs, bool filePicker) {
+String loopSD(FS &fs, bool filePicker, String allowed_ext) {
   String result = "";
   bool reload=false;
   bool redraw = true;
@@ -385,7 +385,7 @@ String loopSD(FS &fs, bool filePicker) {
   closeSdCard();
   setupSdCard();
 
-  readFs(fs, Folder, fileList);
+  readFs(fs, Folder, fileList, allowed_ext);
 
   for(int i=0; i<MAXFILES; i++) if(fileList[i][2]!="") maxFiles++; else break;
   while(1){
@@ -395,7 +395,7 @@ String loopSD(FS &fs, bool filePicker) {
       reset_screensaver_timer();
       if(strcmp(PreFolder.c_str(),Folder.c_str()) != 0 || reload){
         index=0;
-        readFs(fs, Folder, fileList);
+        readFs(fs, Folder, fileList, allowed_ext);
         PreFolder = Folder;
         maxFiles=0;
         for(int i=0; i<MAXFILES; i++) if(fileList[i][2]!="") maxFiles++; else break;

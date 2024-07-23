@@ -355,7 +355,7 @@ void addToRecentCodes(struct RfCodes rfcode)  {
     if(recent_rfcodes_last_used == 16) recent_rfcodes_last_used  = 0; // cycle
 }
 
-struct RfCodes selectRecentMenu() {
+struct RfCodes selectRecentRfMenu() {
     // show menu with filenames
     options = { };
     bool exit = false;
@@ -376,10 +376,10 @@ void otherRFcodes() {
   FS *fs = NULL;
   String filepath = "";
   struct RfCodes selected_code;
-    options = {
-      {"Recent", [&]()  { selected_code = selectRecentMenu(); }},
+  options = {
+      {"Recent", [&]()  { selected_code = selectRecentRfMenu(); }},
       {"LittleFS", [&]()   { fs=&LittleFS; }},
-    };
+  };
   if(setupSdCard()) options.push_back({"SD Card", [&]()  { fs=&SD; }});    
 
   delay(200);
@@ -392,12 +392,10 @@ void otherRFcodes() {
     // no need to proceed, go back
   }
   
-  filepath = loopSD(*fs, true);
+  filepath = loopSD(*fs, true, "SUB");
   databaseFile = fs->open(filepath, FILE_READ);
   drawMainBorder();
   
-  selected_code.filepath = filepath.substring( 1 + filepath.lastIndexOf("/") );
-
   if (!databaseFile) {
     Serial.println("Failed to open database file.");
     displayError("Fail to open file");
@@ -405,6 +403,7 @@ void otherRFcodes() {
     return;
   }
   Serial.println("Opened sub file.");
+  selected_code.filepath = filepath.substring( 1 + filepath.lastIndexOf("/") );
   
   // format specs: https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/file_formats/SubGhzFileFormats.md
   String line;
