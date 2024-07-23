@@ -363,7 +363,7 @@ struct RfCodes selectRecentMenu() {
     for(int i=0; i<16; i++) {
         if(recent_rfcodes[i].filepath=="") continue; // not inited
         // else
-        options.push_back({ recent_rfcodes[i].filepath.c_str(), [&](){ selected_code = recent_rfcodes[i]; }});
+        options.push_back({ recent_rfcodes[i].filepath.c_str(), [i, &selected_code](){ selected_code = recent_rfcodes[i]; }});
     }
     options.push_back({ "Main Menu" , [&](){ exit=true; }});    
     delay(200);
@@ -375,10 +375,9 @@ void otherRFcodes() {
   File databaseFile;
   FS *fs = NULL;
   String filepath = "";
-  struct RfCodes selected_code ;
-  bool recent_menu_selected = false;
+  struct RfCodes selected_code;
     options = {
-      //WIP: {"Recent", [&]()  { selected_code = selectRecentMenu(); recent_menu_selected = true;}},
+      {"Recent", [&]()  { selected_code = selectRecentMenu(); }},
       {"LittleFS", [&]()   { fs=&LittleFS; }},
     };
   if(setupSdCard()) options.push_back({"SD Card", [&]()  { fs=&SD; }});    
@@ -387,7 +386,7 @@ void otherRFcodes() {
   loopOptions(options);
   delay(200);
   
-  if(recent_menu_selected == true) {
+  if(fs == NULL) {  // recent menu was selected
     if(selected_code.filepath!="") sendRfCommand(selected_code);  // a code was selected
     return;
     // no need to proceed, go back
