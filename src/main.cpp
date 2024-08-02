@@ -40,14 +40,29 @@ std::vector<std::pair<std::string, std::function<void()>>> options;
 const int bufSize = 4096;
 uint8_t buff[4096] = {0};
 // Protected global variables
-TFT_eSPI tft = TFT_eSPI();         // Invoke custom library
-TFT_eSprite sprite = TFT_eSprite(&tft);
-TFT_eSprite draw = TFT_eSprite(&tft);
+#if defined(ESP32S3DEVKITC1)
+  #if defined(USE_DUMB_DISPLAY)
+    //TFT_eSPI tft = TFT_eSPI();       https://github.com/trevorwslee/Arduino-DumbDisplay/issues/169
+    GraphicalDDLayer tft;
+  #else
+    SerialDisplayClass tft;
+    SerialDisplayClass& sprite = tft;
+    SerialDisplayClass& draw = tft;
+  #endif
+#else
+  TFT_eSPI tft = TFT_eSPI();         // Invoke custom library
+  TFT_eSprite sprite = TFT_eSprite(&tft);
+  TFT_eSprite draw = TFT_eSprite(&tft);
+#endif
+
 
 #if defined(CARDPUTER)
   Keyboard_Class Keyboard = Keyboard_Class();
 #elif defined (STICK_C_PLUS)
   AXP192 axp192;
+//#elif defined (ESP32S3DEVKITC1)
+//TODO:  onscreen keyboard
+//  
 #endif
 
 #include "Wire.h"
@@ -92,7 +107,18 @@ void setup_gpio() {
 **  Config tft
 *********************************************************************/
 void begin_tft(){
-  tft.init();
+  #if defined(ESP32S3DEVKITC1)
+    #if defined(USE_DUMB_DISPLAY)
+      DumbDisplay dumbdisplay(new DDInputOutput(115200));
+      GraphicalDDLayer *graphical = dumbdisplay.createGraphicalLayer(WIDTH, HEIGHT);
+      tft = *graphical;
+    #else
+      tft.begin(); //115200, 240,320);
+      tft.clear();
+    #endif
+  #else
+    tft.init();
+  #endif
   rotation = gsetRotation();
   tft.setRotation(rotation);
   resetTftDisplay();

@@ -272,6 +272,9 @@ int getBattery() {
   float b = axp192.GetBatVoltage();
   percent = ((b - 3.0) / 1.2) * 100;
 
+  #elif defined (ESP32S3DEVKITC1)
+    // do nothing
+  
   #else
 
     #if defined(CARDPUTER)

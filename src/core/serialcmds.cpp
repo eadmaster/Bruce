@@ -7,7 +7,8 @@
 #include "cJSON.h"
 #include <inttypes.h> // for PRIu64
 
-#ifndef STICK_C_PLUS
+//#ifndef STICK_C_PLUS
+#ifdef CARDPUTER
   #include <ESP8266Audio.h>
   #include <ESP8266SAM.h>
 #endif
@@ -202,7 +203,7 @@ void handleSerialCommands() {
     }
   }  // endof rf
 
-  #ifndef STICK_C_PLUS
+  #if defined(CARDPUTER)
   if(cmd_str.startsWith("music_player " ) || cmd_str.startsWith("tts" ) || cmd_str.startsWith("say" ) ) {
     // TODO: move in audio.cpp module
       AudioOutputI2S *audioout = new AudioOutputI2S();  // https://github.com/earlephilhower/ESP8266Audio/blob/master/src/AudioOutputI2S.cpp#L32

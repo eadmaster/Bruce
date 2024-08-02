@@ -22,6 +22,10 @@ FilePage filePages[100];  // Maximum of 100 pages
 ** Description:   Start SD Card
 ***************************************************************************************/
 bool setupSdCard() {
+  if(SDCARD_SCK==-1) {
+    sdcardMounted = false;
+    return false;
+  }
   sdcardSPI.begin(SDCARD_SCK, SDCARD_MISO, SDCARD_MOSI, SDCARD_CS); // start SPI communications
   delay(10);
   if (!SD.begin(SDCARD_CS, sdcardSPI)) {

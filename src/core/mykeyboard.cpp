@@ -12,6 +12,8 @@ bool checkNextPress(){
   #if defined (CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed('/') || Keyboard.isKeyPressed('.'))
+  #elif defined (ESP32S3DEVKITC1)
+    if(touchRead(DW_BTN)<TOUCH_THRESHOLD)
   #else
     if(digitalRead(DW_BTN)==LOW)
   #endif
@@ -35,6 +37,8 @@ bool checkPrevPress() {
   #elif defined(CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed(',') || Keyboard.isKeyPressed(';'))
+  #elif defined (ESP32S3DEVKITC1)
+    if(touchRead(UP_BTN)<TOUCH_THRESHOLD)
   #endif
   {
     if(wakeUpScreen()){
@@ -53,6 +57,8 @@ bool checkSelPress(){
   #if defined (CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed(KEY_ENTER) || digitalRead(0)==LOW)
+  #elif defined (ESP32S3DEVKITC1)
+    if(touchRead(SEL_BTN)<TOUCH_THRESHOLD)
   #else
     if(digitalRead(SEL_BTN)==LOW)
   #endif
@@ -75,6 +81,8 @@ bool checkEscPress(){
   #elif defined (CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed('`'))
+  #elif defined (ESP32S3DEVKITC1)
+    if(touchRead(UP_BTN)<TOUCH_THRESHOLD)
   #endif
   {
     if(wakeUpScreen()){
@@ -88,9 +96,11 @@ bool checkEscPress(){
 }
 
 bool checkAnyKeyPress() {
-#if defined (CARDPUTER)   // If any key is pressed, it'll jump the boot screen
+  #if defined (CARDPUTER)   // If any key is pressed, it'll jump the boot screen
     Keyboard.update();
     if(Keyboard.isPressed())
+  #elif defined (ESP32S3DEVKITC1)
+    if(touchRead(SEL_BTN)<TOUCH_THRESHOLD)
   #else
     if(digitalRead(SEL_BTN)==LOW)  // If M5 key is pressed, it'll jump the boot screen
   #endif
