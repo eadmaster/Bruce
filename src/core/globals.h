@@ -6,7 +6,6 @@ extern char16_t FGCOLOR;
 #define BGCOLOR TFT_BLACK
 
 #include <Arduino.h>
-#include <TFT_eSPI.h>
 #include <functional>
 #include <vector>
 //#include <SPIFFS.h>
@@ -32,9 +31,16 @@ extern char16_t FGCOLOR;
 #endif
 
 // Declaração dos objetos TFT
-extern TFT_eSPI tft;
-extern TFT_eSprite sprite;
-extern TFT_eSprite draw;
+#if defined(HAS_SCREEN)
+	extern TFT_eSPI tft;
+	extern TFT_eSprite sprite;
+	extern TFT_eSprite draw;
+#else
+    #include "VectorDisplay.h"
+    extern SerialDisplayClass tft;
+    extern SerialDisplayClass& sprite;
+    extern SerialDisplayClass& draw;
+#endif
 
 extern char timeStr[10];
 

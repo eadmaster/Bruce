@@ -134,6 +134,17 @@ const char index_html[] PROGMEM = R"rawliteral(
         top: -7px;
         left: -2px
     }
+    .gg-arrow-up-r {
+        box-sizing: border-box;
+        position: relative;
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        border: 2px solid;
+        transform: scale(var(--ggs,1));
+        cursor: pointer;
+        border-radius: 4px
+    }
     .gg-arrow-down-r {
         box-sizing: border-box;
         position: relative;
@@ -287,7 +298,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <p>
     <form id="save" enctype="multipart/form-data" method="post">
       <input type="hidden" id="actualFolder" name="actualFolder" value="/">
-      <input type="hidden" id="actualFS" name="actualFS" value="SD">
+      <input type="hidden" id="actualFS" name="actualFS" value="LittleFS">
     </form>
     <button onclick="rebootButton()">Reboot</button>
     <button onclick="WifiConfig()">Usr/Pass</button>
@@ -338,7 +349,7 @@ function rebootButton() {
     }
 }
 
-function listFilesButton(folders, fs = 'SD', userRequest = false) {
+function listFilesButton(folders, fs = 'LittleFS', userRequest = false) {
   xmlhttp=new XMLHttpRequest();
   document.getElementById("actualFolder").value = "";
   document.getElementById("actualFolder").value = folders;
@@ -405,6 +416,34 @@ function renameFile(filePath, oldName) {
     var fs = document.getElementById("actualFS").value;
     listFilesButton(actualFolder, fs, true);
   }
+}
+
+function sendIrFile(filePath) {
+  var actualFolder = document.getElementById("actualFolder").value;
+  var fs = document.getElementById("actualFS").value;
+  const ajax5 = new XMLHttpRequest();
+  const formdata5 = new FormData();
+  formdata5.append("fs", fs);
+  formdata5.append("filePath", filePath);
+  ajax5.open("POST", "/ir", false);
+  ajax5.send(formdata5);
+  document.getElementById("status").innerHTML = ajax5.responseText;
+  var fs = document.getElementById("actualFS").value;
+  listFilesButton(actualFolder, fs, true);
+}
+
+function sendSubFile(filePath) {
+  var actualFolder = document.getElementById("actualFolder").value;
+  var fs = document.getElementById("actualFS").value;
+  const ajax5 = new XMLHttpRequest();
+  const formdata5 = new FormData();
+  formdata5.append("fs", fs);
+  formdata5.append("filePath", filePath);
+  ajax5.open("POST", "/rf", false);
+  ajax5.send(formdata5);
+  document.getElementById("status").innerHTML = ajax5.responseText;
+  var fs = document.getElementById("actualFS").value;
+  listFilesButton(actualFolder, fs, true);
 }
 
 function downloadDeleteButton(filename, action) {

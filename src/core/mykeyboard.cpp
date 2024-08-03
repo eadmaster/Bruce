@@ -35,6 +35,8 @@ bool checkPrevPress() {
   #elif defined(CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed(',') || Keyboard.isKeyPressed(';'))
+  #else
+    if(false)
   #endif
   {
     if(wakeUpScreen()){
@@ -78,7 +80,9 @@ bool checkEscPress(){
     Keyboard.update();
     if(Keyboard.isKeyPressed('`'))
   //#elif defined(NEW_DEVICE)
-  
+  #elif ! defined(HAS_SCREEN)
+    // always return false
+    if(false)
   #else
     if(digitalRead(UP_BTN)==LOW)
   #endif

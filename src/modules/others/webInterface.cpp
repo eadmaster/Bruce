@@ -3,6 +3,7 @@
 #include "core/wifi_common.h"  // using common wifisetup
 #include "core/mykeyboard.h"   // using keyboard when calling rename
 #include "core/display.h"      // using displayRedStripe as error msg
+#include "modules/ir/TV-B-Gone.h"
 #include "webInterface.h"
 
 
@@ -78,7 +79,6 @@ String humanReadableSize(uint64_t bytes) {
 }
 
 
-
 /**********************************************************************
 **  Function: listFiles
 **  list all of the files, if ishtml=true, return html rather than simple text
@@ -126,10 +126,12 @@ String listFiles(FS fs, bool ishtml, String folder, bool isLittleFS) {
     if(!(foundfile.isDirectory())) {
       if (ishtml) {
         returnText += "<tr align='left'><td>" + String(foundfile.name());
-        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("bin")) returnText+= "&nbsp<i class=\"rocket\" onclick=\"startUpdate(\'" + String(foundfile.path()) + "\')\"></i>";
         returnText += "</td>\n";
         returnText += "<td style=\"font-size: 10px; text-align=center;\">" + humanReadableSize(foundfile.size()) + "</td>\n";
         returnText += "<td><i class=\"gg-arrow-down-r\" onclick=\"downloadDeleteButton(\'"+ String(foundfile.path()) + "\', \'download\')\"></i>&nbsp&nbsp\n";
+        //if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("bin")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"startUpdate(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
+        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("sub")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"sendSubFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
+        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("ir")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"sendIrFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
         returnText += "<i class=\"gg-rename\"  onclick=\"renameFile(\'" + String(foundfile.path()) + "\', \'" + String(foundfile.name()) + "\')\"></i>&nbsp&nbsp\n";
         returnText += "<i class=\"gg-trash\"  onclick=\"downloadDeleteButton(\'" + String(foundfile.path()) + "\', \'delete\')\"></i></td></tr>\n\n";
       } else {
@@ -279,7 +281,23 @@ void configureWebServer() {
 
     }
   });
-
+  
+  // Route to send an ir file
+  server->on("/ir", HTTP_POST, []() {
+    if (server->hasArg("filePath"))  {
+      String fs = server->arg("fs");
+      String filePath = server->arg("filePath").c_str();
+      if(fs == "SD") {
+        if( otherIRcodesHeadless(&SD, filePath) ) // no error
+          server->send(200, "text/plain", "sent");  
+      } else {
+        if( otherIRcodesHeadless(&LittleFS, filePath) )  // no error
+          server->send(200, "text/plain", "sent"); 
+      }
+    }
+    server->send(400, "text/plain", "ERROR");
+  });
+  
   // Reinicia o ESP
   server->on("/reboot", HTTP_GET, []() {
     if (checkUserWebAuth()) {

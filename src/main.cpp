@@ -46,9 +46,15 @@ std::vector<std::pair<std::string, std::function<void()>>> options;
 const int bufSize = 4096;
 uint8_t buff[4096] = {0};
 // Protected global variables
-TFT_eSPI tft = TFT_eSPI();         // Invoke custom library
-TFT_eSprite sprite = TFT_eSprite(&tft);
-TFT_eSprite draw = TFT_eSprite(&tft);
+#if defined(HAS_SCREEN)
+	TFT_eSPI tft = TFT_eSPI();         // Invoke custom library
+	TFT_eSprite sprite = TFT_eSprite(&tft);
+	TFT_eSprite draw = TFT_eSprite(&tft);
+#else
+    SerialDisplayClass tft;
+    SerialDisplayClass& sprite = tft;
+    SerialDisplayClass& draw = tft;
+#endif
 
 #if defined(CARDPUTER)
   Keyboard_Class Keyboard = Keyboard_Class();
@@ -84,7 +90,8 @@ void setup_gpio() {
     Keyboard.begin();
     pinMode(0, INPUT);
     pinMode(10, INPUT);     // Pin that reads the
-  #elif defined(NEW_DEVICE)
+  #elif ! defined(HAS_SCREEN)
+	// do nothing
   #else
     pinMode(UP_BTN, INPUT);   // Sets the power btn as an INPUT
     pinMode(SEL_BTN, INPUT);
@@ -102,7 +109,12 @@ void setup_gpio() {
 **  Config tft
 *********************************************************************/
 void begin_tft(){
+#if defined(HAS_SCREEN)
   tft.init();
+#else
+	tft.begin(); //115200, 240,320);
+	tft.clear();
+#endif
   rotation = gsetRotation();
   tft.setRotation(rotation);
   resetTftDisplay();
@@ -256,6 +268,7 @@ void setup() {
 **  Function: loop
 **  Main loop
 **********************************************************************/
+#if defined(HAS_SCREEN)
 void loop() {
   #if defined(STICK_C_PLUS) || defined(STICK_C_PLUS2)
     RTC_TimeTypeDef _time;
@@ -322,3 +335,27 @@ void loop() {
     }
   }
 }
+#else
+
+// alternative loop function for headless boards
+#include "core/wifi_common.h"
+#include "modules/others/webInterface.h"
+
+void loop() {
+  Serial.println("alt loop()");
+  setupSdCard();
+  getConfigs();
+  
+  
+  if(!wifiConnected) {
+    Serial.println("wifiConnect");
+    wifiConnect("",0,true);  // TODO: read mode from settings file
+  }
+  Serial.println("startWebUi");
+  startWebUi(true);  // MEMO: will quit when checkEscPress
+
+  // TODO: start a task for
+  //  handleSerialCommands();
+
+}
+#endif

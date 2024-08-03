@@ -7,7 +7,7 @@
 #include "cJSON.h"
 #include <inttypes.h> // for PRIu64
 
-#ifndef STICK_C_PLUS
+#if defined(HAS_NS4168_SPKR)
   #include <ESP8266Audio.h>
   #include <ESP8266SAM.h>
 #endif
