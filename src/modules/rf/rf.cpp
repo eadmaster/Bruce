@@ -688,6 +688,7 @@ void otherRFcodes() {
   if(filepath=="") return;  //  cancelled
   // else
   txSubFile(fs, filepath);
+  returnToMenu=true;
 }
   
   

@@ -86,7 +86,9 @@ void handleSerialCommands() {
 
   //log_d(cmd_str.c_str());
   cmd_str.trim();
-  //cmd_str.toLowerCase();  // case-insensitive matching  -> issue with filenames
+  // case-insensitive matching only without filename args -- TODO: better solution for this
+  if(cmd_str.indexOf("from_file ") == -1)
+    cmd_str.toLowerCase();
   
   processSerialCommand(cmd_str);
 }
@@ -100,6 +102,9 @@ bool processSerialCommand(String cmd_str) {
   }
 
   if(cmd_str.startsWith("ir") ) {
+    
+      gsetIrTxPin(false);
+      //if(IrTx==0) IrTx = LED;  // quickfix init issue? CARDPUTER is 44
 
     // ir tx <protocol> <address> <command>
     // <protocol>: NEC, NECext, NEC42, NEC42ext, Samsung32, RC6, RC5, RC5X, SIRC, SIRC15, SIRC20, Kaseikyo, RCA
@@ -124,7 +129,8 @@ bool processSerialCommand(String cmd_str) {
        sendRC6Command(address, command);
        return true;
       }
-    // TODO: more protocols: Samsung32, SIRC
+    //if(cmd_str.startsWith("ir tx sirc")){
+    //if(cmd_str.startsWith("ir tx samsung")){
     
     //if(cmd_str.startsWith("ir tx raw")){
     
@@ -144,7 +150,6 @@ bool processSerialCommand(String cmd_str) {
       // e.g. IRSend {"Protocol":"NEC","Bits":32,"Data":"0x20DF10EF"}
       // TODO: rewrite using ArduinoJson parser?
       // TODO: decode "data" into "address, command" and use existing "send*Command" funcs
-      if(IrTx==0) IrTx = LED;  // quickfix init issue? CARDPUTER is 44
 
       //IRsend irsend(IrTx);  //inverted = false
       //Serial.println(IrTx);
@@ -197,7 +202,9 @@ bool processSerialCommand(String cmd_str) {
   }  // end of ir commands
 
   if(cmd_str.startsWith("rf") || cmd_str.startsWith("subghz" )) {
-    if(RfTx==0) RfTx=GROVE_SDA; // quick fix
+    
+    gsetRfTxPin(false);
+    //if(RfTx==0) RfTx=GROVE_SDA; // quick fix
     pinMode(RfTx, OUTPUT);
     //Serial.println(RfTx);
 

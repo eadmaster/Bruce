@@ -55,8 +55,9 @@ bool checkSelPress(){
   #if defined (CARDPUTER)
     Keyboard.update();
     if(Keyboard.isKeyPressed(KEY_ENTER) || digitalRead(0)==LOW)
-  //#elif defined(NEW_DEVICE)
-
+  #elif ! defined(HAS_SCREEN)
+    // always return false
+    if(false)
   #else
     if(digitalRead(SEL_BTN)==LOW)
   #endif
@@ -131,9 +132,8 @@ int checkNumberShortcutPress() {
       }
     // else
     return -1;
-#endif
 }
-
+#endif
 
 /* Starts keyboard to type data */
 String keyboard(String mytext, int maxSize, String msg) {

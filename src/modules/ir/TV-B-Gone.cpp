@@ -499,6 +499,8 @@ void otherIRcodes() {
     if(checkEscPress() || exit) break;
     delay(200);
   }
+  
+  returnToMenu=true;
 }  // end of otherIRcodes
 
 

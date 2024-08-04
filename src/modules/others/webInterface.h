@@ -27,6 +27,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   <meta charset="UTF-8">
 
   <!-- CSS sample thanks to @im.nix (Discord) -->
+  <!-- MEMO: more icons available here https://css.gg/app  -->
   <style>
     .gg-rename {
       box-sizing: border-box;
@@ -136,16 +137,42 @@ const char index_html[] PROGMEM = R"rawliteral(
         top: -7px;
         left: -2px
     }
-    .gg-arrow-up-r {
-        box-sizing: border-box;
-        position: relative;
-        display: inline-block;
-        width: 22px;
-        height: 22px;
-        border: 2px solid;
-        transform: scale(var(--ggs,1));
-        cursor: pointer;
-        border-radius: 4px
+    .gg-data {
+      transform: scale(var(--ggs,1))
+    }
+    .gg-data,
+    .gg-data::after,
+    .gg-data::before {
+      box-sizing: border-box;
+      position: relative;
+      display: block;
+      border: 2px solid;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px
+    }
+    .gg-data::after,
+    .gg-data::before {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      top: 2px;
+      left: 2px
+    }
+    .gg-data::after {
+      background: linear-gradient( to left,
+          currentColor 8px,transparent 0)
+          no-repeat bottom center/2px 8px;
+      width: 22px;
+      height: 22px;
+      top: -6px;
+      left: -6px
+    }
+    .gg-data,
+    .gg-data::after {
+      border-top-color: transparent;
+      border-bottom-color: transparent
     }
     .gg-arrow-down-r {
         box-sizing: border-box;

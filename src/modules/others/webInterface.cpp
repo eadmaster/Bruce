@@ -130,10 +130,10 @@ String listFiles(FS fs, bool ishtml, String folder, bool isLittleFS) {
         returnText += "<td style=\"font-size: 10px; text-align=center;\">" + humanReadableSize(foundfile.size()) + "</td>\n";
         returnText += "<td><i class=\"gg-arrow-down-r\" onclick=\"downloadDeleteButton(\'"+ String(foundfile.path()) + "\', \'download\')\"></i>&nbsp&nbsp\n";
         //if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("bin")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"startUpdate(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
-        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("sub")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"sendSubFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
-        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("ir")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"sendIrFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
+        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("sub")) returnText+= "<i class=\"gg-data\" onclick=\"sendSubFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
+        if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("ir")) returnText+= "<i class=\"gg-data\" onclick=\"sendIrFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
         #if defined(USB_as_HID)
-          if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("txt")) returnText+= "<i class=\"gg-arrow-up-r\" onclick=\"sendBadusbFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
+          if (String(foundfile.name()).substring(String(foundfile.name()).lastIndexOf('.') + 1).equalsIgnoreCase("txt")) returnText+= "<i class=\"gg-data\" onclick=\"sendBadusbFile(\'" + String(foundfile.path()) + "\')\"></i>&nbsp&nbsp\n";
         #endif
         returnText += "<i class=\"gg-rename\"  onclick=\"renameFile(\'" + String(foundfile.path()) + "\', \'" + String(foundfile.name()) + "\')\"></i>&nbsp&nbsp\n";
         returnText += "<i class=\"gg-trash\"  onclick=\"downloadDeleteButton(\'" + String(foundfile.path()) + "\', \'delete\')\"></i></td></tr>\n\n";
@@ -255,6 +255,22 @@ void configureWebServer() {
   // Index page
   server->on("/", HTTP_GET, []() {
     if (checkUserWebAuth()) {
+      // WIP: custom webui page serving
+      /*
+      FS* fs = NULL;
+      File custom_index_html_file = NONE;
+      if(SD.exists("/webui.html")) fs = &SD;
+      if(LittleFS.exists("/webui.html")) fs = &LittleFS;
+      if(fs) {
+        // try to read the custom page and serve that
+        File custom_index_html_file =  fs->open("/webui.html", FILE_READ);
+        if(custom_index_html_file) {
+          // read the whole file
+          //server->send(200, "text/html", processor(custom_index_html));
+        }
+      }
+      */
+      // just serve the hardcoded page
       server->send(200, "text/html", processor(index_html));
     } else {
       server->requestAuthentication();
