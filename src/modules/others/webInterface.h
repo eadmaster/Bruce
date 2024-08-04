@@ -448,6 +448,20 @@ function sendSubFile(filePath) {
   listFilesButton(actualFolder, fs, true);
 }
 
+function sendBadusbFile(filePath) {
+  if(!confirm("Confirm executing the selected DuckyScript on the machine connected via USB?")) return;
+  var actualFolder = document.getElementById("actualFolder").value;
+  var fs = document.getElementById("actualFS").value;
+  const ajax5 = new XMLHttpRequest();
+  const formdata5 = new FormData();
+  formdata5.append("cmnd", "badusb tx_from_file  " + filePath);
+  ajax5.open("POST", "/cm", false);
+  ajax5.send(formdata5);
+  document.getElementById("status").innerHTML = ajax5.responseText;
+  var fs = document.getElementById("actualFS").value;
+  listFilesButton(actualFolder, fs, true);
+}
+
 function downloadDeleteButton(filename, action) {
   var fs = document.getElementById("actualFS").value;
   var urltocall = "/file?name=" + filename + "&action=" + action + "&fs=" + fs;
