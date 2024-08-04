@@ -259,7 +259,12 @@ void setup() {
   init_clock();
 
   if(!LittleFS.begin(true)) { LittleFS.format(), LittleFS.begin();}
-
+  
+  #if ! defined(HAS_SCREEN)
+    // start a task to handle serial commands while the webui is running
+    startSerialCommandsHandlerTask();
+  #endif
+  
   delay(200);
   previousMillis = millis();
 }
@@ -342,10 +347,8 @@ void loop() {
 #include "modules/others/webInterface.h"
 
 void loop() {
-  Serial.println("alt loop()");
   setupSdCard();
   getConfigs();
-  
   
   if(!wifiConnected) {
     Serial.println("wifiConnect");
@@ -353,9 +356,5 @@ void loop() {
   }
   Serial.println("startWebUi");
   startWebUi(true);  // MEMO: will quit when checkEscPress
-
-  // TODO: start a task for
-  //  handleSerialCommands();
-
 }
 #endif

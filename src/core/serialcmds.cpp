@@ -2,8 +2,7 @@
 #include "serialcmds.h"
 #include "globals.h"
 #include <IRsend.h>
-#include <string>
-#include "modules/ir/TV-B-Gone.h"
+//#include <string>
 #include "cJSON.h"
 #include <inttypes.h> // for PRIu64
 
@@ -17,6 +16,35 @@
 #include "display.h"
 #include "powerSave.h"
 #include "modules/rf/rf.h"
+#include "modules/ir/TV-B-Gone.h"
+
+
+/* task to handle serial commands, currently used in headless mode only */
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+void serialcmds_loop(void* pvParameters) {
+  Serial.begin (115200);  
+  while (1) {
+    handleSerialCommands();
+    //delay (500); // wait for half a second
+    vTaskDelay(500);  // sleep this task only
+  }
+}
+
+void startSerialCommandsHandlerTask() {
+    TaskHandle_t serialcmdsTaskHandle;
+    
+	  xTaskCreatePinnedToCore (
+      serialcmds_loop,     // Function to implement the task
+      "serialcmds",   // Name of the task (any string)
+      20000,      // Stack size in bytes
+      NULL,      // This is a pointer to the parameter that will be passed to the new task. We are not using it here and therefore it is set to NULL.
+      0,         // Priority of the task
+      &serialcmdsTaskHandle,      // Task handle (optional, can be NULL).
+      0          // Core where the task should run. By default, all your Arduino code runs on Core 1 and the Wi-Fi and RF functions (these are usually hidden from the Arduino environment) use the Core 0.
+      );
+}
 
 
 void SerialPrintHexString(uint64_t val) {
@@ -27,7 +55,10 @@ void SerialPrintHexString(uint64_t val) {
   Serial.println(s);
 }
 
+
 void handleSerialCommands() {
+  // read and process a single command
+  
   String cmd_str;
 
   /*
@@ -54,12 +85,17 @@ void handleSerialCommands() {
 
   //log_d(cmd_str.c_str());
   cmd_str.trim();
-  cmd_str.toLowerCase();  // case-insensitive matching
+  //cmd_str.toLowerCase();  // case-insensitive matching  -> issue with filenames
+  
+  processSerialCommand(cmd_str);
+}
 
-  //  TODO: more commands https://docs.flipper.net/development/cli#0Z9fs
+
+bool processSerialCommand(String cmd_str) {
+  // return true on success, false on error
 
   if(cmd_str == "" ) { // empty
-    return;
+    return false;
   }
 
   if(cmd_str.startsWith("ir") ) {
@@ -73,22 +109,33 @@ void handleSerialCommands() {
        String address = cmd_str.substring(10, 10+8);
        String command = cmd_str.substring(19, 19+8);
        sendNECCommand(address, command);  // TODO: add arg for displayRedStripe optional
-       return;
+       return true;
       }
     if(cmd_str.startsWith("ir tx rc5 ")){
        String address = cmd_str.substring(10, 10+8);
        String command = cmd_str.substring(19, 19+8);
        sendRC5Command(address, command);
-       return;
+       return true;
       }
     if(cmd_str.startsWith("ir tx rc6 ")){
        String address = cmd_str.substring(10, 10+8);
        String command = cmd_str.substring(19, 19+8);
        sendRC6Command(address, command);
-       return;
+       return true;
       }
-      // TODO: more protocols: Samsung32, SIRC
-      //if(cmd_str.startsWith("ir tx raw")){
+    // TODO: more protocols: Samsung32, SIRC
+    
+    //if(cmd_str.startsWith("ir tx raw")){
+    
+    if(cmd_str.startsWith("ir tx_from_file ")){
+      String filepath = cmd_str.substring(strlen("ir tx_from_file "), cmd_str.length());
+      if(filepath.indexOf(".ir") == -1) return false;  // invalid filename
+      if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
+      if (SD.begin()) if (SD.exists(filepath)) return  txIrFile(&SD, filepath);
+      if (LittleFS.begin()) if (LittleFS.exists(filepath)) return  txIrFile(&LittleFS, filepath);
+      // else file not found
+      return false;
+    }
 
     if(cmd_str.startsWith("irsend")) {
       // tasmota json command  https://tasmota.github.io/docs/Tasmota-IR/#sending-ir-commands
@@ -105,7 +152,7 @@ void handleSerialCommands() {
       cJSON *root = cJSON_Parse(cmd_str.c_str() + 6);
       if (root == NULL) {
         Serial.println("This is NOT json format");
-        return;
+        return false;
       }
       uint16_t bits = 32; // defaults to 32 bits
       const char *dataStr = "";
@@ -121,7 +168,7 @@ void handleSerialCommands() {
         dataStr = dataItem->valuestring;
       } else {
         Serial.println("missing or invalid data to send");
-        return;
+        return false;
       }
       //String dataStr = cmd_str.substring(36, 36+8);
       uint64_t data = strtoul(dataStr, nullptr, 16);
@@ -135,14 +182,16 @@ void handleSerialCommands() {
       if(protocolStr == "nec"){
         // sendNEC(uint64_t data, uint16_t nbits, uint16_t repeat)
         irsend.sendNEC(data, bits, 10);
+        return true;
       }
       // TODO: more protocols
+      return false;
     }
 
     // turn off the led
     digitalWrite(IrTx, LED_OFF);
     //backToMenu();
-    return;
+    return false;
   }  // end of ir commands
 
   if(cmd_str.startsWith("rf") || cmd_str.startsWith("subghz" )) {
@@ -150,12 +199,22 @@ void handleSerialCommands() {
     pinMode(RfTx, OUTPUT);
     //Serial.println(RfTx);
 
+    if(cmd_str.startsWith("subghz tx_from_file")) {
+      String filepath = cmd_str.substring(strlen("subghz tx_from_file "), cmd_str.length());
+      if(filepath.indexOf(".sub") == -1) return false;  // invalid filename
+      if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
+      if (SD.begin()) if (SD.exists(filepath)) return  txSubFile(&SD, filepath);
+      if (LittleFS.begin()) if (LittleFS.exists(filepath)) return  txSubFile(&LittleFS, filepath);
+      // else file not found
+      return false;
+    }
     /* WIP:
     if(cmd_str.startsWith("subghz tx")) {
       // flipperzero-like cmd  https://docs.flipper.net/development/cli/#wLVht
       // e.g. subghz tx 0000000000200001 868250000 403 10  // https://forum.flipper.net/t/friedland-libra-48249sl-wireless-doorbell-request/4528/20
       //                {hex_key} {frequency} {te} {count}
     }*/
+    
     if(cmd_str.startsWith("rfsend")) {
       // tasmota json command  https://tasmota.github.io/docs/Tasmota-IR/#sending-ir-commands
       // e.g. RfSend {"Data":"0x447503","Bits":24,"Protocol":1,"Pulse":174,"Repeat":10}  // on
@@ -164,7 +223,7 @@ void handleSerialCommands() {
       cJSON *root = cJSON_Parse(cmd_str.c_str() + 6);
       if (root == NULL) {
         Serial.println("This is NOT json format");
-        return;
+        return false;
       }
       unsigned int bits = 32; // defaults to 32 bits
       const char *dataStr = "";
@@ -187,7 +246,7 @@ void handleSerialCommands() {
       } else {
         Serial.println("missing or invalid data to send");
         cJSON_Delete(root);
-        return;
+        return false;
       }
       //String dataStr = cmd_str.substring(36, 36+8);
       uint64_t data = strtoul(dataStr, nullptr, 16);
@@ -198,7 +257,7 @@ void handleSerialCommands() {
       RCSwitch_send(data, bits, pulse, protocol, repeat);
 
       cJSON_Delete(root);
-      return;
+      return true;
     }
   }  // endof rf
 
@@ -231,7 +290,7 @@ void handleSerialCommands() {
           if(!source) {
             Serial.print("audio file not found: ");
             Serial.println(song);
-            return;
+            return false;
           }
           if(source){
             // switch on extension
@@ -274,7 +333,7 @@ void handleSerialCommands() {
         ESP8266SAM *sam = new ESP8266SAM;
         sam->Say(audioout, cmd_str.c_str() + strlen("tts "));
         delete sam;
-        return;
+        return true;
       }
 
       if(generator && source && audioout) {
@@ -284,15 +343,16 @@ void handleSerialCommands() {
           if (!generator->loop()) generator->stop();
         }
         delete generator; delete source, delete audioout;
-        return;
+        return true;
       }
     }  // end of music_player
- #endif
+ #endif  // HAS_NS4168_SPKR
 
   // WIP: record | mic
   // https://github.com/earlephilhower/ESP8266Audio/issues/70
   // https://github.com/earlephilhower/ESP8266Audio/pull/118
 
+#if defined(HAS_SCREEN)
   // backlight brightness adjust (range 0-255) https://docs.flipper.net/development/cli/#XQQAI
   // e.g. "led br 127"
   if(cmd_str.startsWith("led br ")) {
@@ -303,7 +363,7 @@ void handleSerialCommands() {
     if(value<=0) value=1;
     if(value>100) value=100;
     setBrightness(value, false);  // false -> do not save
-    return;
+    return true;
   }
   else if(cmd_str.startsWith("led ")) {
     // change UI color
@@ -312,18 +372,24 @@ void handleSerialCommands() {
     int r, g, b;
     if (sscanf(rgbString, "%d %d %d", &r, &g, &b) != 3) {
         Serial.println("invalid color: " + String(rgbString));
-        return;
+        return false;
     }
     if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
         Serial.println("invalid color: " + String(rgbString));
-        return;
+        return false;
     }
     uint16_t hexColor = tft.color565(r, g, b);  // Use the TFT_eSPI function to convert RGB to 16-bit color
     //Serial.print("converted color:");
     //SerialPrintHexString(hexColor);
     FGCOLOR = hexColor;  // change global var, dont save in settings
-    return;
+    return true;
   }
+  if(cmd_str == "clock" ) {
+      //esp_timer_stop(screensaver_timer);  // disable screensaver while the clock is running
+      runClockLoop();
+      return true;
+  }
+#endif  // HAS_SCREEN
 
   // power cmds: off, reboot, sleep
   if(cmd_str == "power off" ) {
@@ -337,33 +403,27 @@ void handleSerialCommands() {
       //ESP.deepSleep(0);
       esp_deep_sleep_start();  // only wake up via hardware reset
     #endif
-    return;
+    return true;
   }
   if(cmd_str == "power reboot" ) {
     ESP.restart();
-    return;
+    return true;
   }
   if(cmd_str == "power sleep" ) {
     // NOTE: cmd not supported on flipper0
     setSleepMode();
     //turnOffDisplay();
     //esp_timer_stop(screensaver_timer);
-    return;
-  }
-
-  if(cmd_str == "clock" ) {
-      //esp_timer_stop(screensaver_timer);  // disable screensaver while the clock is running
-      runClockLoop();
-      return;
+    return true;
   }
 
   // TODO: "storage" cmd to manage files  https://docs.flipper.net/development/cli/#Xgais
 
   // TODO: "gpio" cmds  https://docs.flipper.net/development/cli/#aqA4b
 
+  //  TODO: more commands https://docs.flipper.net/development/cli#0Z9fs
 
   Serial.println("unsupported serial command: " + cmd_str);
-
-
+  return false;
 }
 

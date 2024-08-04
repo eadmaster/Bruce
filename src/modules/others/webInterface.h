@@ -6,6 +6,8 @@
 #include <ESPmDNS.h>
 #include <typeinfo>
 
+extern WebServer* server;  // used to check if the webserver is running
+
 // function defaults
 String humanReadableSize(uint64_t bytes);
 String listFiles(FS fs, bool ishtml, String folder, bool isLittleFS);
@@ -419,13 +421,13 @@ function renameFile(filePath, oldName) {
 }
 
 function sendIrFile(filePath) {
+  if(!confirm("Confirm spamming all codes inside the file?")) return;
   var actualFolder = document.getElementById("actualFolder").value;
   var fs = document.getElementById("actualFS").value;
   const ajax5 = new XMLHttpRequest();
   const formdata5 = new FormData();
-  formdata5.append("fs", fs);
-  formdata5.append("filePath", filePath);
-  ajax5.open("POST", "/ir", false);
+  formdata5.append("cmnd", "ir tx_from_file " + filePath);
+  ajax5.open("POST", "/cm", false);
   ajax5.send(formdata5);
   document.getElementById("status").innerHTML = ajax5.responseText;
   var fs = document.getElementById("actualFS").value;
@@ -433,13 +435,13 @@ function sendIrFile(filePath) {
 }
 
 function sendSubFile(filePath) {
+  if(!confirm("Confirm sending the codes inside the file?")) return;
   var actualFolder = document.getElementById("actualFolder").value;
   var fs = document.getElementById("actualFS").value;
   const ajax5 = new XMLHttpRequest();
   const formdata5 = new FormData();
-  formdata5.append("fs", fs);
-  formdata5.append("filePath", filePath);
-  ajax5.open("POST", "/rf", false);
+  formdata5.append("cmnd", "subghz tx_from_file " + filePath);
+  ajax5.open("POST", "/cm", false);
   ajax5.send(formdata5);
   document.getElementById("status").innerHTML = ajax5.responseText;
   var fs = document.getElementById("actualFS").value;

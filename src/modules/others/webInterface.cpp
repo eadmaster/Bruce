@@ -3,7 +3,7 @@
 #include "core/wifi_common.h"  // using common wifisetup
 #include "core/mykeyboard.h"   // using keyboard when calling rename
 #include "core/display.h"      // using displayRedStripe as error msg
-#include "modules/ir/TV-B-Gone.h"
+#include "core/serialcmds.h"
 #include "webInterface.h"
 
 
@@ -282,22 +282,19 @@ void configureWebServer() {
     }
   });
   
-  // Route to send an ir file
-  server->on("/ir", HTTP_POST, []() {
-    if (server->hasArg("filePath"))  {
-      String fs = server->arg("fs");
-      String filePath = server->arg("filePath").c_str();
-      if(fs == "SD") {
-        if( otherIRcodesHeadless(&SD, filePath) ) // no error
-          server->send(200, "text/plain", "sent");  
+  // Route to send an generic command (Tasmota compatible API) https://tasmota.github.io/docs/Commands/#with-web-requests
+  server->on("/cm", HTTP_POST, []() {
+    if (server->hasArg("cmnd"))  {
+      String cmnd = server->arg("cmnd");
+      if( processSerialCommand( cmnd ) ) {
+        server->send(200, "text/plain", "OK");  
       } else {
-        if( otherIRcodesHeadless(&LittleFS, filePath) )  // no error
-          server->send(200, "text/plain", "sent"); 
+        server->send(400, "text/plain", "ERROR, check the serial log on the device for details");
       }
     }
-    server->send(400, "text/plain", "ERROR");
+    server->send(400, "text/plain", "http request missing required arg: cmnd");
   });
-  
+    
   // Reinicia o ESP
   server->on("/reboot", HTTP_GET, []() {
     if (checkUserWebAuth()) {
