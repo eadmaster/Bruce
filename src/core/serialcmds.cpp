@@ -17,6 +17,7 @@
 #include "powerSave.h"
 #include "modules/rf/rf.h"
 #include "modules/ir/TV-B-Gone.h"
+#include "modules/others/bad_usb.h"
 
 
 /* task to handle serial commands, currently used in headless mode only */
@@ -129,10 +130,11 @@ bool processSerialCommand(String cmd_str) {
     
     if(cmd_str.startsWith("ir tx_from_file ")){
       String filepath = cmd_str.substring(strlen("ir tx_from_file "), cmd_str.length());
+      filepath.trim();
       if(filepath.indexOf(".ir") == -1) return false;  // invalid filename
       if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
-      if (SD.begin()) if (SD.exists(filepath)) return  txIrFile(&SD, filepath);
-      if (LittleFS.begin()) if (LittleFS.exists(filepath)) return  txIrFile(&LittleFS, filepath);
+      if(SD.exists(filepath)) return  txIrFile(&SD, filepath);
+      if(LittleFS.exists(filepath)) return  txIrFile(&LittleFS, filepath);
       // else file not found
       return false;
     }
@@ -201,22 +203,25 @@ bool processSerialCommand(String cmd_str) {
 
     if(cmd_str.startsWith("subghz tx_from_file")) {
       String filepath = cmd_str.substring(strlen("subghz tx_from_file "), cmd_str.length());
+      filepath.trim();
       if(filepath.indexOf(".sub") == -1) return false;  // invalid filename
       if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
-      if (SD.begin()) if (SD.exists(filepath)) return  txSubFile(&SD, filepath);
-      if (LittleFS.begin()) if (LittleFS.exists(filepath)) return  txSubFile(&LittleFS, filepath);
+      if(SD.exists(filepath)) return  txSubFile(&SD, filepath);
+      if(LittleFS.exists(filepath)) return  txSubFile(&LittleFS, filepath);
       // else file not found
       return false;
     }
-    /* WIP:
+    
+    /* TODO:
     if(cmd_str.startsWith("subghz tx")) {
       // flipperzero-like cmd  https://docs.flipper.net/development/cli/#wLVht
       // e.g. subghz tx 0000000000200001 868250000 403 10  // https://forum.flipper.net/t/friedland-libra-48249sl-wireless-doorbell-request/4528/20
       //                {hex_key} {frequency} {te} {count}
+      * //RCSwitch_send( hexStringToDecimal(txt.c_str()) , bits, pulse, protocol, repeat);
     }*/
     
     if(cmd_str.startsWith("rfsend")) {
-      // tasmota json command  https://tasmota.github.io/docs/Tasmota-IR/#sending-ir-commands
+      // tasmota json command  https://tasmota.github.io/docs/RF-Protocol/
       // e.g. RfSend {"Data":"0x447503","Bits":24,"Protocol":1,"Pulse":174,"Repeat":10}  // on
       // e.g. RfSend {"Data":"0x44750C","Bits":24,"Protocol":1,"Pulse":174,"Repeat":10}  // off
 
@@ -260,6 +265,24 @@ bool processSerialCommand(String cmd_str) {
       return true;
     }
   }  // endof rf
+  
+  #if defined(USB_as_HID)
+    // badusb available
+    if(cmd_str.startsWith("badusb tx_from_file ")) {
+      String filepath = cmd_str.substring(strlen("badusb tx_from_file "), cmd_str.length());
+      filepath.trim();
+      if(filepath.indexOf(".txt") == -1) return false;  // invalid filename
+      if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
+      FS* fs = NULL;
+      if(SD.exists(filepath)) fs = &SD;
+      if(LittleFS.exists(filepath)) fs = &LittleFS;
+      if(!fs) return false;  // file not found
+      Kb.begin();
+      USB.begin();
+      key_input(*fs, filepath);
+      return true;
+    }
+  #endif
 
   #if defined(HAS_NS4168_SPKR) //M5StickCs doesn't have speakers.. they have buzzers on pin 02 that only beeps in different frequencies
   if(cmd_str.startsWith("music_player " ) || cmd_str.startsWith("tts" ) || cmd_str.startsWith("say" ) ) {
