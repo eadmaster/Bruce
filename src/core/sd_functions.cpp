@@ -7,6 +7,7 @@
 #include "modules/rf/rf.h"
 #include "modules/ir/TV-B-Gone.h"
 #include "modules/others/bad_usb.h"
+#include "modules/others/qrcode_menu.h"
 
 struct FilePage {
   int pageIndex;
@@ -284,6 +285,100 @@ String readLineFromFile(File myFile) {
   return line;
 }
 
+
+/***************************************************************************************
+** Function name: readSmallFile
+** Description:   read a small (<3KB) file and return its contents as a single string
+**                on any error returns an empty string
+***************************************************************************************/
+String readSmallFile(FS &fs, String filepath) {
+  String fileContent = "";
+  File file;
+
+  file = fs.open(filepath, FILE_READ);
+  if (!file) return "";
+
+  size_t fileSize = file.size();
+  if(fileSize > 1024*3) {  // 3K is the max
+      displayError("File is too big");
+      return "";
+  }
+  
+  fileContent = file.readString();
+
+  file.close();
+  return fileContent;
+}
+
+
+
+bool is_valid_ascii(const String &text) {
+    for (int i = 0; i < text.length(); i++) {
+        char c = text[i];
+        // Check if the character is within the printable ASCII range or is a newline/carriage return
+        if (!(c >= 32 && c <= 126) && c != 10 && c != 13) {
+            return false; // Invalid character found
+        }
+    }
+    return true; // All characters are valid
+}
+
+
+String aes_decrypt(uint8_t* cipher_bin, size_t cipher_len, const String& password);
+
+String readDecryptedAesFile(FS &fs, String filepath) {
+  File file;
+
+  file = fs.open(filepath, FILE_READ);
+  if (!file) return "";
+
+  size_t fileSize = file.size();
+  if(fileSize > 1024*3) {  // 3K is the max
+      displayError("File is too big");
+      return "";
+  }
+  
+  char buffer[fileSize];
+  size_t bytesRead = file.readBytes(buffer, fileSize);
+  Serial.print("fileSize:");
+  Serial.println(fileSize);
+  Serial.println(bytesRead);
+  
+  /*
+  // read the whole file with a single call
+  char buffer[fileSize + 1];
+  size_t bytesRead = file.readBytes(buffer, fileSize);
+  buffer[bytesRead] = '\0'; // Null-terminate the string
+  return String(buffer);
+  */
+  
+  if (bytesRead==0) {
+    Serial.println("empty cypherText");
+    return "";
+  }
+  // else
+  
+  if(cachedPassword.length()==0) {
+    cachedPassword = keyboard("", 32, "password");
+    if(cachedPassword.length()==0) return "";  // cancelled
+  }
+  
+  // else try to decrypt
+  String plaintext = aes_decrypt((uint8_t*)buffer, bytesRead, cachedPassword);
+  
+  // check if really plaintext
+  if(!is_valid_ascii(plaintext)) {
+    // invalidate cached password -> will ask again on the next try
+    cachedPassword = "";
+    Serial.println(plaintext);
+    Serial.println("invalid password");
+    return "";
+  }
+  // else
+  return plaintext;
+}
+
+
 /***************************************************************************************
 ** Function name: sortList
 ** Description:   sort files for name
@@ -343,6 +438,7 @@ void clearFileList(String list[][3]) {
       i++;
     }
 }
+
 bool checkExt(String ext, String pattern) {
     if (ext == pattern) return true;
 
@@ -351,6 +447,7 @@ bool checkExt(String ext, String pattern) {
     std::regex ext_regex(charArray);
     return std::regex_search(ext.c_str(), ext_regex);
 }
+
 
 /***************************************************************************************
 ** Function name: sortList
@@ -533,14 +630,41 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
           if(filepath.endsWith(".sub")) options.insert(options.begin(), {"Subghz Tx",  [&]() { 
               delay(200);
               txSubFile(&fs, filepath);
-            }});
+            }});          
           #if defined(USB_as_HID)
-          if(filepath.endsWith(".txt")) options.insert(options.begin(), {"BadUSB Run",  [&]() { 
-              Kb.begin();
-              USB.begin();
+          if(filepath.endsWith(".txt")) {
+            options.push_back({"BadUSB Run",  [&]() { 
+              Kb.begin(); USB.begin();
               key_input(fs, filepath);
             }});
+            /*
+            options.push_back({"USB HID Type",  [&]() { 
+              Kb.begin(); USB.begin();
+              Kb.print(readSmallFile(fs, filepath).c_str());  // buggy?
+              //String t = readSmallFile(fs, filepath).c_str();
+              //Kb.write((const uint8_t*) t.c_str(), t.length());
+            }});*/
+          }
+          if(filepath.endsWith(".aes") || filepath.endsWith(".enc")) {  // aes encrypted files
+              options.insert(options.begin(), {"Decrypt+Type",  [&]() { 
+                  String plaintext = readDecryptedAesFile(fs, filepath);
+                  if(plaintext.length()==0) return displayError("invalid password");;  // file is too big or cannot read, or cancelled
+                  // else
+                  Kb.begin(); USB.begin();
+                  Kb.print(plaintext.c_str());
+              }});
+          }
           #endif
+          if(filepath.endsWith(".aes") || filepath.endsWith(".enc")) {  // aes encrypted files
+              options.insert(options.begin(), {"Decrypt+Show",  [&]() {
+                String plaintext = readDecryptedAesFile(fs, filepath);
+                if(plaintext.length()==0) return;  // file is too big or cannot read, or cancelled
+                // else
+                displaySuccess(plaintext);
+                delay(2000);
+                // TODO: loop and wait for user input?
+              }});
+          }
           #if defined(HAS_NS4168_SPKR)
           if(isAudioFile(filepath)) options.insert(options.begin(), {"Play Audio",  [&]() { 
             delay(200);
@@ -548,7 +672,13 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
             setup_gpio(); //TODO: remove after fix select loop
           }});
           #endif
-
+          // generate qr codes from small files (<10K)
+          int filesize = 0;  // TODO: check filesize without opening
+          if(filesize < 3*1024) options.push_back({"QR code",  [&]() { 
+              delay(200);
+              qrcode_display(readSmallFile(fs, filepath));
+            }});
+            
           options.push_back({"Main Menu", [&]() { exit = true; }});
           delay(200);
           if(!filePicker) loopOptions(options);

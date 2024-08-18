@@ -17,6 +17,7 @@ int RfTx;
 int RfRx;
 int RfModule=0;  // 0 - single-pinned, 1 - CC1101+SPI
 float RfFreq=433.92;
+String cachedPassword="";
 int dimmerSet;
 int bright=100;
 int tmz=3;
@@ -107,7 +108,7 @@ void setup_gpio() {
   #if defined(BACKLIGHT)
   pinMode(BACKLIGHT, OUTPUT);
   #endif
-  initCC1101once(); // Sets GPIO in the CC1101 lib
+  if(RfModule==1) initCC1101once(); // Sets GPIO in the CC1101 lib
 }
 
 
@@ -377,7 +378,7 @@ void loop() {
 void loop() {
   setupSdCard();
   getConfigs();
-  
+
   if(!wifiConnected) {
     Serial.println("wifiConnect");
     wifiConnect("",0,true);  // TODO: read mode from settings file

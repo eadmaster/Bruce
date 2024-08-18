@@ -523,7 +523,7 @@ void sendNECCommand(String address, String command) {
 
 
 void sendRC5Command(String address, String command) {
-  IRsend irsend(IrTx,true);  // Set the GPIO to be used to sending the message.
+  IRsend irsend(IrTx);  // Set the GPIO to be used to sending the message.
   irsend.begin();
   displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
   uint8_t addressValue = strtoul(address.substring(0,2).c_str(), nullptr, 16);
@@ -535,7 +535,7 @@ void sendRC5Command(String address, String command) {
 }
 
 void sendRC6Command(String address, String command) {
-  IRsend irsend(IrTx,true);  // Set the GPIO to be used to sending the message.
+  IRsend irsend(IrTx);  // Set the GPIO to be used to sending the message.
   irsend.begin();
   displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
   uint32_t addressValue = strtoul(address.c_str(), nullptr, 16);

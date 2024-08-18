@@ -376,8 +376,9 @@ void initCC1101once() {
         #else
             ELECHOUSE_cc1101.setGDO0(CC1101_GDO0_PIN);  // use Gdo0 for both Tx and Rx
         #endif
+        
         /*
-        Don't need to start comunications now
+        //Don't need to start comunications now
         if (ELECHOUSE_cc1101.getCC1101()){       // Check the CC1101 Spi connection.
             Serial.println("cc1101 Connection OK");
         } else {
@@ -385,8 +386,7 @@ void initCC1101once() {
             return;
         }
         ELECHOUSE_cc1101.Init();
-        */        
-
+        */
     #else
         Serial.println("Error: USE_CC1101_VIA_SPI not defined for this board");
         //TODO: interface using PCA9554
@@ -413,8 +413,6 @@ bool initRfModule(String mode, float frequency) {
     
     if(RfModule == 1) { // CC1101 in use
         #ifdef USE_CC1101_VIA_SPI               
-            ELECHOUSE_cc1101.Init();
-
             if (ELECHOUSE_cc1101.getCC1101()){       // Check the CC1101 Spi connection.
                 Serial.println("cc1101 Connection OK");
             } else {
@@ -473,7 +471,7 @@ bool initRfModule(String mode, float frequency) {
 }
 
 
-bool RCSwitch_Read_Raw(float frequency) {
+bool RCSwitch_Read_Raw(float frequency, int max_loops) {
     RCSwitch rcswitch = RCSwitch();
     RfCodes received;
 
@@ -581,7 +579,7 @@ RestartRec:
                     int i=0;
                     File file;
                     String FS="";
-                    if(SD.begin()) {
+                    if(sdcardMounted) {
                         if (!SD.exists("/BruceRF")) SD.mkdir("/BruceRF");
                         while(SD.exists("/BruceRF/bruce_" + String(i) + ".sub")) i++;
                         file = SD.open("/BruceRF/bruce_"+ String(i) +".sub", FILE_WRITE);
@@ -609,14 +607,19 @@ RestartRec:
                 }
             }
         }
+        #ifndef HAS_SCREEN
+            // headless mode, quit if nothing received after max_loops
+            max_loops -= 1;
+            if(max_loops==0) {
+                Serial.println("timeout");
+                return false;
+            }
+        #endif
     }
     Exit:
     delay(1);
     
-    #ifdef USE_CC1101_VIA_SPI   
-    if(RfModule==1) 
-        ELECHOUSE_cc1101.setSidle();
-    #endif
+    deinitRfModule();
         
     return true;
 }
