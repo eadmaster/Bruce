@@ -24,8 +24,12 @@ int dimmerSet;
 int bright=100;
 int tmz=3;
 bool sdcardMounted = false;
+#ifdef BOARD_HAS_PSRAM
+bool psRamFSMounted = false;
+#endif
 bool gpsConnected = false;
 bool wifiConnected = false;
+String wifiIP = "";
 bool BLEConnected = false;
 bool returnToMenu;
 bool isSleeping = false;

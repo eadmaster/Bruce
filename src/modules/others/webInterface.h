@@ -1,12 +1,11 @@
 
 #include <WiFi.h>
-#include <WebServer.h>
 #include <SD.h>
 #include <SPI.h>
 #include <ESPmDNS.h>
 #include <typeinfo>
 
-extern WebServer* server;  // used to check if the webserver is running
+//extern void* server;  // used to check if the webserver is running
 
 // function defaults
 String humanReadableSize(uint64_t bytes);
@@ -556,6 +555,7 @@ function showUploadButtonFancy(folders) {
   "<p>Send file to " + folders + "</p>"+
   "<form id=\"upload_form\" enctype=\"multipart/form-data\" method=\"post\">" +
   "<input type=\"hidden\" id=\"folder\" name=\"folder\" value=\"" + folders + "\">" +
+  "<input type=\"checkbox\" name=\"encryptCheckbox\" id=\"encryptCheckbox\"> Encrypted<br>" +
   "<input type=\"file\" name=\"file1\" id=\"file1\" onchange=\"uploadFile('" + folders + "', 'SD')\"><br>" +
   "<progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:100%;\"></progress>" +
   "<h3 id=\"status\"></h3>" +
@@ -568,17 +568,84 @@ function _(el) {
   return document.getElementById(el);
 }
 
+async function CreateEncryptedFile(file, password){
 
+    if (!file || !password) {
+        alert('Please select a file and enter a password');
+        return null;
+    }
 
-function uploadFile(folder) {
+    const fileArrayBuffer = await file.arrayBuffer();
+
+    // Generate a key using PBKDF2
+    const enc = new TextEncoder();
+    const passwordKey = await window.crypto.subtle.importKey(
+        'raw', 
+        enc.encode(password), 
+        { name: 'PBKDF2' }, 
+        false, 
+        ['deriveKey']
+    );
+
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const key = await window.crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+    const encryptedContent = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        fileArrayBuffer
+    );
+
+    // Combine salt, iv, and encrypted content
+    const encryptedArray = new Uint8Array(salt.byteLength + iv.byteLength + encryptedContent.byteLength);
+    encryptedArray.set(salt, 0);
+    encryptedArray.set(iv, salt.byteLength);
+    encryptedArray.set(new Uint8Array(encryptedContent), salt.byteLength + iv.byteLength);
+
+    const encryptedBase64 = btoa(String.fromCharCode.apply(null, encryptedArray));
+
+    //console.log(file.name+".aes");
+    //console.log(encryptedBase64);
+    
+    const encfile = new File([encryptedBase64], file.name+".enc", { type: "text/plain" });
+    return encfile;
+}
+
+var cachedPassword = "";
+
+async function uploadFile(folder) {
   var fs = document.getElementById("actualFS").value;
   var folder = _("folder").value;
   var files = _("file1").files; // Extract files from input element
+  
+  var encrypted = _("encryptCheckbox").checked;
+  if(encrypted) cachedPassword = prompt("Enter encryption password (do not lose it): ", cachedPassword);
 
   var formdata = new FormData();
+  
   for (var i = 0; i < files.length; i++) {
-    formdata.append("files[]", files[i]); // Append each file to form data
+    // Append each file to form data
+    if(encrypted) {
+      // replace with encrypted file
+      formdata.append("files[]", await CreateEncryptedFile(files[i], cachedPassword));
+    } else {
+      formdata.append("files[]", files[i]);
+    }
   }
+  
   formdata.append("folder", folder);
 
   var ajax = new XMLHttpRequest();

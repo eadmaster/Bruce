@@ -66,7 +66,13 @@ extern int prog_handler;    // 0 - Flash, 1 - LittleFS, 2 - Download
 
 extern bool sdcardMounted;  // inform if SD Cardis active or not
 
+#ifdef BOARD_HAS_PSRAM
+extern bool psRamFSMounted;
+#endif
+
 extern bool wifiConnected;  // inform if wifi is active or not
+
+extern String wifiIP;
 
 extern bool BLEConnected;  // inform if BLE is active or not
 

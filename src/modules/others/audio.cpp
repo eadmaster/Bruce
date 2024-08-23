@@ -192,3 +192,48 @@ void _tone(unsigned int frequency, unsigned long duration) {
 #endif
 }
 
+void playDTMF(String input) {
+    
+  const int DTMF_frequencies[][2] = {
+    {697, 1209},  // 1
+    {697, 1336},  // 2
+    {697, 1477},  // 3
+    {770, 1209},  // 4
+    {770, 1336},  // 5
+    {770, 1477},  // 6
+    {852, 1209},  // 7
+    {852, 1336},  // 8
+    {852, 1477},  // 9
+    {941, 1336},  // 0
+    {941, 1209},  // *
+    {941, 1477}   // #
+  };
+
+  for (int i = 0; i < input.length(); i++) {
+      char key = input.charAt(i);
+      int index;
+
+      // Determine the index based on the key pressed
+      switch (key) {
+        case '1': index = 0; break;
+        case '2': index = 1; break;
+        case '3': index = 2; break;
+        case '4': index = 3; break;
+        case '5': index = 4; break;
+        case '6': index = 5; break;
+        case '7': index = 6; break;
+        case '8': index = 7; break;
+        case '9': index = 8; break;
+        case '0': index = 9; break;
+        case '*': index = 10; break;
+        case '#': index = 11; break;
+        default: continue; // Invalid key, skip to the next character
+      }
+
+      // Play the two tones sequentially using _tone function
+      _tone(DTMF_frequencies[index][0], 300);
+      _tone(DTMF_frequencies[index][1], 300);
+
+      delay(50); // Short delay between tones
+  }
+}

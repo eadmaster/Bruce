@@ -300,7 +300,7 @@ String readSmallFile(FS &fs, String filepath) {
   if (!file) return "";
 
   size_t fileSize = file.size();
-  if(fileSize > 1024*3) {  // 3K is the max
+  if(fileSize > SAFE_STACK_BUFFER_SIZE) {
       displayError("File is too big");
       Serial.println("File is too big");
       return "";
@@ -348,34 +348,9 @@ bool is_valid_ascii(const String &text) {
 }
 
 String readDecryptedAesFile(FS &fs, String filepath) {
-  File file = fs.open(filepath, FILE_READ);
-  if (!file) return "";
-
-  size_t fileSize = file.size();
-  if(fileSize > 1024*3) {  // 3K is the max
-      displayError("File is too big");
-      return "";
-  }
-  
-  char buffer[fileSize];
-  size_t bytesRead = file.readBytes(buffer, fileSize);
-  //Serial.print("fileSize:");
-  //Serial.println(fileSize);
-  //Serial.println(bytesRead);
-  
-  /*
-  // read the whole file with a single call
-  char buffer[fileSize + 1];
-  size_t bytesRead = file.readBytes(buffer, fileSize);
-  buffer[bytesRead] = '\0'; // Null-terminate the string
-  return String(buffer);
-  */
-  
-  if (bytesRead==0) {
-    Serial.println("empty cypherText");
-    return "";
-  }
-  // else
+  String base64enc = readSmallFile(fs, filepath);
+  //Serial.println(base64enc);
+  if(base64enc.length() == 0) return "";
   
   if(cachedPassword.length()==0) {
     cachedPassword = keyboard("", 32, "password");
@@ -383,8 +358,9 @@ String readDecryptedAesFile(FS &fs, String filepath) {
   }
   
   // else try to decrypt
-  String plaintext = aes_decrypt((uint8_t*)buffer, bytesRead, cachedPassword);
+  String plaintext = aes_decrypt(base64enc, cachedPassword);
   
+  /*
   // check if really plaintext
   if(!is_valid_ascii(plaintext)) {
     // invalidate cached password -> will ask again on the next try
@@ -392,7 +368,7 @@ String readDecryptedAesFile(FS &fs, String filepath) {
     Serial.println("invalid password");
     Serial.println(plaintext);
     return "";
-  }
+  }*/
   // else
   return plaintext;
 }
@@ -665,9 +641,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
               //Kb.write((const uint8_t*) t.c_str(), t.length());
             }});*/
           }
-          #endif
-          /* WIP
-          if(filepath.endsWith(".aes") || filepath.endsWith(".enc")) {  // aes encrypted files
+          if(filepath.endsWith(".aes")) {  // aes encrypted files
               options.insert(options.begin(), {"Decrypt+Type",  [&]() { 
                   String plaintext = readDecryptedAesFile(fs, filepath);
                   if(plaintext.length()==0) return displayError("invalid password");;  // file is too big or cannot read, or cancelled
@@ -677,16 +651,18 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
               }});
           }
           #endif
-          if(filepath.endsWith(".aes") || filepath.endsWith(".enc")) {  // aes encrypted files
+          if(filepath.endsWith(".aes")) {  // aes encrypted files
               options.insert(options.begin(), {"Decrypt+Show",  [&]() {
                 String plaintext = readDecryptedAesFile(fs, filepath);
                 if(plaintext.length()==0) return;  // file is too big or cannot read, or cancelled
                 // else
-                displaySuccess(plaintext);
-                delay(2000);
-                // TODO: loop and wait for user input?
+                //if(plaintext.length()<..)
+                  displaySuccess(plaintext);
+                  while(!checkAnyKeyPress()) delay(500);
+                // else
+                // TODO: show in the text viewer
               }});
-          }*/
+          }
           #if defined(HAS_NS4168_SPKR)
           if(isAudioFile(filepath)) options.insert(options.begin(), {"Play Audio",  [&]() { 
             delay(200);
@@ -697,7 +673,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
           // generate qr codes from small files (<3K)
           size_t filesize = getFileSize(fs, filepath);
           //Serial.println(filesize);
-          if(filesize < 3*1024 && filesize>0) options.push_back({"QR code",  [&]() { 
+          if(filesize < SAFE_STACK_BUFFER_SIZE && filesize>0) options.push_back({"QR code",  [&]() { 
               delay(200);
               qrcode_display(readSmallFile(fs, filepath));
             }});
@@ -723,7 +699,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
     }
 
     #ifdef CARDPUTER
-      /*
+      /* TODO: go back 1 level instead of quitting
       if(Keyboard.isKeyPressed(KEY_BACKSPACE)) {
         // go back 1 level
           if(Folder == "/") break;

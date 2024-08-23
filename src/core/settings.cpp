@@ -276,9 +276,10 @@ void setRFModuleMenu() {
 #ifdef USE_CC1101_VIA_SPI    
     {"CC1101 on SPI",  [&]() { result = 1; }},
 #endif
+    {"Bruce on UART",  [&]() { result = 2; }},
 /* WIP:
  * #ifdef USE_CC1101_VIA_PCA9554    
- * {"CC1101+PCA9554",  [&]() { result = 2; }},
+ * {"CC1101+PCA9554",  [&]() { result = ?; }},
  * #endif
 */
   };
@@ -299,6 +300,32 @@ void setRFModuleMenu() {
     #endif
     // else display an error
     displayError("CC1101 not found");
+    delay(1000);
+  }
+  if(result == 2) {
+    // open and check uart connection
+    Serial.printf("trying setting up 2nd serial port on pins RX=%d TX=%d\n",GROVE_SDA, GROVE_SCL);
+    pinMode(GROVE_SDA, INPUT);
+    pinMode(GROVE_SCL, OUTPUT);
+    Serial2.begin(115200, SERIAL_8N1, GROVE_SDA, GROVE_SCL); // RXD2=2=GROVE_SDA, TXD2=1=GROVE_SCL
+    //Serial2.setRxTimeout(uint8_t symbols_timeout)
+    Serial2.println("info device");  // check bruce version
+    Serial2.flush();
+    delay(2000);
+    if (Serial2.available() >= 1) {
+      String r = Serial2.readStringUntil('\n');
+      Serial.println("daugherboard response: " + r);
+      if(r.startsWith("Bruce")) {
+        // Bruce daugherboard found
+        RfModule=2;
+        EEPROM.write(13, RfModule); //set the byte
+        EEPROM.commit(); // Store data to EEPROM
+        EEPROM.end(); // Free EEPROM memory 
+        return;
+      }
+    }
+    // else display an error
+    displayError("Bruce not found on UART");
     delay(1000);
   }
   // fallback to "M5 RF433T/R" on errors
@@ -765,7 +792,7 @@ void getConfigs() {
       else log_i("Wrote new conf to EEPROM");
     } 
     EEPROM.end();
-    log_i("Using config.conf setup file");
+    log_i("Using " CONFIG_FILE "setup file");
   } else {
       goto Default;
       log_i("Using settings stored on EEPROM");
@@ -815,12 +842,12 @@ void saveConfigs() {
     log_i("Failed to create file");
     file.close();
     return;
-  } else log_i("config.conf created");
+  } else log_i(CONFIG_FILE " created");
   // Serialize JSON to file
   serializeJsonPretty(settings,Serial);
   if (serializeJsonPretty(settings, file) < 5) {
     log_i("Failed to write to file");
-  } else log_i("config.conf written successfully");
+  } else log_i(CONFIG_FILE " written successfully");
 
   // Close the file
   file.close();

@@ -454,6 +454,9 @@ bool initRfModule(String mode, float frequency) {
             return false;
         #endif
     
+    } else if(RfModule == 2) { // Bruce over uart
+        // initted in setRFModuleMenu()
+        Serial2.flush();
     } else {
         // single-pinned module
         if(frequency!=RfFreq) {
@@ -563,7 +566,7 @@ RestartRec:
             subfile_out += "Protocol: RcSwitch\n";
             subfile_out += "Bit: " + String(received.Bit) + "\n";
             subfile_out += "Key: " + String(hexString) + "\n";
-            // subfile_out += "RAW_Data: " + received.data; // not in flipper pattern
+            //TODO: subfile_out += "RAW_Data: " + received.data;
             subfile_out += "TE: " + String(received.te) + "\n";
             
             #ifndef HAS_SCREEN
@@ -814,6 +817,26 @@ void sendRfCommand(struct RfCodes rfcode) {
             Serial.println("USE_CC1101_VIA_SPI not defined");
             return;
         #endif
+    } else if(RfModule == 2) { // Bruce over uart
+        Serial2.println("subghz tx_from_buffer");
+        String subfile_out = "Filetype: Bruce SubGhz RAW File\nVersion 1\n";
+        subfile_out += "Frequency: " + String(frequency) + "\n";
+        subfile_out += "Preset: " + String(rfcode.preset) + "\n";
+        subfile_out += "Protocol: " + String(rfcode.protocol) + "\n";
+        if(rfcode.key) {
+            subfile_out += "Bit: " + String(rfcode.Bit) + "\n";
+            char hexString[64];
+            decimalToHexString(rfcode.key,hexString);
+            subfile_out += "Key: " + String(hexString) + "\n";
+            subfile_out += "TE: " + String(rfcode.te) + "\n";
+        } else {
+            subfile_out += "RAW_Data: " + rfcode.data + "\n";
+        }
+        Serial2.println(subfile_out);
+        Serial2.println("EOF");
+        Serial2.flush();
+        Serial.println("data sent to serial2");
+        return;
     } else {
         // other single-pinned modules in use
         if(modulation != 2) {
