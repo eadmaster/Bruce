@@ -26,24 +26,29 @@
   #include "modules/others/audio.h"
 #endif
 
-#ifdef BOARD_HAS_PSRAM
-  #include <PSRamFS.h> // https://github.com/tobozo/ESP32-PsRamFS
-  
-  bool setupPsramFs() {
-    if(psRamFSMounted) return true;  // avoid reinit
 
-    PSRamFS.setPartitionSize( ESP.getFreePsram()/2 ); // use half of psram
+#include <PSRamFS.h>
 
-    if(!PSRamFS.begin()){
-      Serial.println("PSRamFS Mount Failed");
-      psRamFSMounted = false;
-      return false;
-    }
-    // else
-    psRamFSMounted = true;
-    return true;
+bool setupPsramFs() {
+  // https://github.com/tobozo/ESP32-PsRamFS/blob/main/examples/PSRamFS_Test/PSRamFS_Test.ino
+  if(psRamFSMounted) return true;  // avoid reinit
+
+  #ifdef BOARD_HAS_PSRAM
+  PSRamFS.setPartitionSize( ESP.getFreePsram()/2 ); // use half of psram
+  #else
+  PSRamFS.setPartitionSize( SAFE_STACK_BUFFER_SIZE );
+  #endif
+
+  if(!PSRamFS.begin()){
+    Serial.println("PSRamFS Mount Failed");
+    psRamFSMounted = false;
+    return false;
   }
-#endif
+  // else
+  psRamFSMounted = true;
+  return true;
+}
+
 
 String readSmallFileFromSerial() {
   String buf = "";
@@ -152,6 +157,8 @@ void handleSerialCommands() {
   bool r = processSerialCommand(cmd_str);
   if(r) setup_gpio(); // temp fix for menu inf. loop
   else Serial.println("failed: " + cmd_str);
+  
+  returnToMenu = true; // forced menu redrawn
 }
 
 bool processSerialCommand(String cmd_str) {
@@ -180,6 +187,7 @@ bool processSerialCommand(String cmd_str) {
   if(cmd_str.startsWith("rf ")) cmd_str.replace("rf ", "subghz ");
   if(cmd_str.startsWith("bu ")) cmd_str.replace("bu ", "badusb ");
   if(cmd_str.startsWith("set ")) cmd_str.replace("set ", "settings ");
+  if(cmd_str.startsWith("decrypt ")) cmd_str.replace("decrypt ", "crypto decrypt_from_file ");
 
   // case-insensitive matching only in some cases -- TODO: better solution for this
   if(cmd_str.indexOf("from_file ") == -1 && cmd_str.indexOf("storage ") == -1 && cmd_str.indexOf("settings "))
@@ -307,26 +315,6 @@ bool processSerialCommand(String cmd_str) {
       //Serial.println((int) frequency);
       return RCSwitch_Read_Raw(frequency, 10);
     }
-    #ifdef BOARD_HAS_PSRAM
-    if(cmd_str == "subghz tx_from_buffer") {
-      // https://github.com/tobozo/ESP32-PsRamFS/blob/main/examples/PSRamFS_Test/PSRamFS_Test.ino
-      String filepath = cmd_str.substring(strlen("subghz tx_from_buffer "));
-      filepath.trim();
-      if(filepath.indexOf(".sub") == -1) return false;  // invalid filename
-      if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
-      if(!(setupPsramFs())) return false;
-      String txt = readSmallFileFromSerial();
-      String tmpfilepath = "tmpramfile";  // TODO: random name
-      File f = PSRamFS.open(tmpfilepath, FILE_WRITE);
-      if(!f) return false;
-      f.write((const uint8_t*) txt.c_str(), txt.length());
-      f.close();
-      //if(PSRamFS.exists(filepath)) 
-      bool r = txSubFile(&PSRamFS, tmpfilepath);
-      PSRamFS.remove(tmpfilepath);  // TODO: keep cached?
-      return r;
-    }
-    #endif
     if(cmd_str.startsWith("subghz tx_from_file")) {
       // subghz tx_from_file plug1_on.sub
       String filepath = cmd_str.substring(strlen("subghz tx_from_file "));
@@ -337,6 +325,19 @@ bool processSerialCommand(String cmd_str) {
       if(LittleFS.exists(filepath)) return  txSubFile(&LittleFS, filepath);
       // else file not found
       return false;
+    }
+    if(cmd_str == "subghz tx_from_buffer") {
+      if(!(setupPsramFs())) return false;
+      String txt = readSmallFileFromSerial();
+      String tmpfilepath = "/tmpramfile";  // TODO: random name?
+      File f = PSRamFS.open(tmpfilepath, FILE_WRITE);
+      if(!f) return false;
+      f.write((const uint8_t*) txt.c_str(), txt.length());
+      f.close();
+      //if(PSRamFS.exists(filepath)) 
+      bool r = txSubFile(&PSRamFS, tmpfilepath);
+      PSRamFS.remove(tmpfilepath);  // TODO: keep cached?
+      return r;
     }
 
     if(cmd_str.startsWith("subghz tx")) {
@@ -422,8 +423,22 @@ bool processSerialCommand(String cmd_str) {
       key_input(*fs, filepath);
       return true;
     }
+    if(cmd_str == "badusb tx_from_buffer") {
+      if(!(setupPsramFs())) return false;
+      String txt = readSmallFileFromSerial();
+      String tmpfilepath = "/tmpramfile";  // TODO: random name?
+      File f = PSRamFS.open(tmpfilepath, FILE_WRITE);
+      if(!f) return false;
+      f.write((const uint8_t*) txt.c_str(), txt.length());
+      f.close();
+      Kb.begin();
+      USB.begin();
+      key_input(PSRamFS, tmpfilepath);
+      PSRamFS.remove(tmpfilepath);  // TODO: keep cached?
+      return true;
+    }
   #endif
-
+  
   #if defined(HAS_NS4168_SPKR) || defined(BUZZ_PIN)
     if(cmd_str.startsWith("tone") || cmd_str.startsWith("beep")) {  // || cmd_str.startsWith("music_player beep" )
       const char* args = cmd_str.c_str() + 4;
@@ -473,7 +488,7 @@ bool processSerialCommand(String cmd_str) {
     }
  #endif  // HAS_NS4168_SPKR
 
-  // WIP: record | mic
+// WIP: record | mic
   // https://github.com/earlephilhower/ESP8266Audio/issues/70
   // https://github.com/earlephilhower/ESP8266Audio/pull/118
 
@@ -550,13 +565,15 @@ bool processSerialCommand(String cmd_str) {
     // https://github.com/espressif/arduino-esp32/issues/6976
     // 2FIX: not waking up
     //Serial.println(TX);
-    //Serial.println(RX);
-    //Serial.println((gpio_num_t)RX);
-    gpio_sleep_set_direction((gpio_num_t)RX, GPIO_MODE_INPUT);
-    gpio_sleep_set_pull_mode((gpio_num_t)RX, GPIO_PULLUP_ONLY);
-    uart_set_wakeup_threshold(UART_NUM_0, 3);  // 3 edges on U0RXD to wakeup
+    Serial.println(RX);
+    Serial.println((gpio_num_t)RX);
+    Serial.println("going to sleep...");
+    //gpio_sleep_set_direction((gpio_num_t)RX, GPIO_MODE_INPUT);
+    //gpio_sleep_set_pull_mode((gpio_num_t)RX, GPIO_PULLUP_ONLY);
+    uart_set_wakeup_threshold(UART_NUM_0, 1);  // 3 edges on U0RXD to wakeup
     esp_sleep_enable_uart_wakeup(UART_NUM_0);
     esp_light_sleep_start();
+    Serial.println("woken");
     return true;
   }
   
@@ -939,10 +956,7 @@ bool processSerialCommand(String cmd_str) {
   }
 
   if(cmd_str.startsWith("crypto decrypt_from_file")) {
-    // crypto decrypt_from_file passwords/github.com_pkcs5_pbkdf2.enc password
-    // crypto decrypt_from_file passwords/github.com_md5.enc 1234
-    // crypto decrypt_from_file passwords/github.com2.enc 1234
-    // crypto decrypt_from_file passwords/test.enc 123
+    // crypto decrypt_from_file passwords/vmoptions.txt.enc 123
     String args = cmd_str.substring(strlen("crypto decrypt_from_file "));
     String filepath = args.substring(0, args.indexOf(" "));
     filepath.trim();

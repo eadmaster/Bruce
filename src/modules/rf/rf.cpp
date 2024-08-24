@@ -395,14 +395,17 @@ void initCC1101once(SPIClass* SSPI) {
 }
 
 void deinitRfModule() {
-    if(RfModule==1) 
+    if(RfModule==1) {
         #ifdef USE_CC1101_VIA_SPI
             ELECHOUSE_cc1101.setSidle();
         #else
             return;
         #endif
-    else
+    } else if(RfModule == 2) { // Bruce over uart
+        Serial2.println("power sleep_and_wakeup_from_uart");
+    } else {
         digitalWrite(RfTx, LED_OFF);
+    }
 }
 
 
@@ -456,7 +459,9 @@ bool initRfModule(String mode, float frequency) {
     
     } else if(RfModule == 2) { // Bruce over uart
         // initted in setRFModuleMenu()
+        Serial2.println("info device");  // wakeup
         Serial2.flush();
+        delay(500);
     } else {
         // single-pinned module
         if(frequency!=RfFreq) {

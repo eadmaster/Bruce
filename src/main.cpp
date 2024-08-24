@@ -24,9 +24,7 @@ int dimmerSet;
 int bright=100;
 int tmz=3;
 bool sdcardMounted = false;
-#ifdef BOARD_HAS_PSRAM
 bool psRamFSMounted = false;
-#endif
 bool gpsConnected = false;
 bool wifiConnected = false;
 String wifiIP = "";
@@ -304,11 +302,6 @@ void setup() {
   if(!LittleFS.begin(true)) { LittleFS.format(), LittleFS.begin();}
   
   boot_screen();
-  
-  #if ! defined(HAS_SCREEN)
-    // start a task to handle serial commands while the webui is running
-    startSerialCommandsHandlerTask();
-  #endif
 
   delay(200);
   previousMillis = millis();
@@ -346,6 +339,7 @@ void loop() {
     }
 
     handleSerialCommands();
+    
 #ifdef CARDPUTER
     checkShortcutPress();  // shortctus to quickly start apps without navigating the menus
 #endif
@@ -398,11 +392,19 @@ void loop() {
   setupSdCard();
   getConfigs();
   
-  if(!wifiConnected) {
-    Serial.println("wifiConnect");
-    wifiConnect("",0,true);  // TODO: read mode from settings file
-  }
-  Serial.println("startWebUi");
-  startWebUi(true);  // MEMO: will quit when checkEscPress
+  #ifdef AUTOSTART_WEBUI
+    // start a task to handle serial commands while the webui is running
+    startSerialCommandsHandlerTask();
+
+    if(!wifiConnected) {
+      Serial.println("wifiConnect");
+      wifiConnect("",0,true);  // TODO: read mode from settings file
+    }
+    Serial.println("startWebUi");
+    startWebUi(true);  // MEMO: will quit when checkEscPress
+  #else
+    handleSerialCommands();
+    delay(100);
+  #endif
 }
 #endif
