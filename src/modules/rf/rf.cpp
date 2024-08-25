@@ -402,7 +402,8 @@ void deinitRfModule() {
             return;
         #endif
     } else if(RfModule == 2) { // Bruce over uart
-        Serial2.println("power sleep_and_wakeup_from_uart");
+        //Serial2.println("power sleep_and_wakeup_from_uart");  //2FIX: buggy wakeup
+        return;
     } else {
         digitalWrite(RfTx, LED_OFF);
     }
@@ -513,6 +514,15 @@ RestartRec:
         #else
             return false;
         #endif
+    } else if(RfModule == 2) { // bruce over uart
+        Serial2.println("subghz rx " + String(frequency));
+        /* TODO: read and parse output
+            String curr_line = "";
+            while (Serial2.available()) {
+              curr_line = Serial.readStringUntil('\n');
+              Serial2.println(curr_line);
+            }*/
+        return false;
     } else {
         rcswitch.enableReceive(RfRx);
     }

@@ -15,12 +15,14 @@
 #include "settings.h"
 #include "display.h"
 #include "powerSave.h"
+#include "wifi_common.h"
 #include "modules/rf/rf.h"
 //#include "modules/rf/rtl433.h"
 //#include "modules/rf/radiolib_test.h"
 #include "modules/ir/TV-B-Gone.h"
 #include "modules/ir/ir_read.h"
 #include "modules/others/bad_usb.h"
+#include "modules/others/webInterface.h"
 
 #if defined(HAS_NS4168_SPKR) || defined(BUZZ_PIN)
   #include "modules/others/audio.h"
@@ -88,7 +90,7 @@ void startSerialCommandsHandlerTask() {
       "serialcmds",   // Name of the task (any string)
       20000,      // Stack size in bytes
       NULL,      // This is a pointer to the parameter that will be passed to the new task. We are not using it here and therefore it is set to NULL.
-      1,         // Priority of the task
+      2,         // Priority of the task
       &serialcmdsTaskHandle,      // Task handle (optional, can be NULL).
       1          // Core where the task should run. By default, all your Arduino code runs on Core 1 and the Wi-Fi and RF functions (these are usually hidden from the Arduino environment) use the Core 0.
       );
@@ -556,23 +558,41 @@ bool processSerialCommand(String cmd_str) {
     return true;
   }
 
+  if(cmd_str == "webui" ) {
+    // start the webui
+    if(!wifiConnected) {
+      Serial.println("wifiConnect");
+      wifiConnect("",0,true);  // TODO: read mode from settings file
+    }
+    Serial.println("startWebUi");
+    startWebUi(true);  // MEMO: will quit when checkEscPress
+    return true;
+  }
+  
   if(cmd_str == "power sleep_and_wakeup_from_uart" ) {
     #ifdef HAS_SCREEN
       turnOffDisplay();
     #endif
     // https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/sleep_modes.html#uart-wakeup-light-sleep-only
+    // 2FIX: not waking up
     // https://github.com/espressif/arduino-esp32/issues/5107
     // https://github.com/espressif/arduino-esp32/issues/6976
-    // 2FIX: not waking up
     //Serial.println(TX);
-    Serial.println(RX);
-    Serial.println((gpio_num_t)RX);
+    //Serial.println(RX);
+    //Serial.println((gpio_num_t)RX);
     Serial.println("going to sleep...");
-    //gpio_sleep_set_direction((gpio_num_t)RX, GPIO_MODE_INPUT);
-    //gpio_sleep_set_pull_mode((gpio_num_t)RX, GPIO_PULLUP_ONLY);
-    uart_set_wakeup_threshold(UART_NUM_0, 1);  // 3 edges on U0RXD to wakeup
+    //uart_set_pin(UART_NUM_0, TX, RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    gpio_sleep_set_direction((gpio_num_t)RX, GPIO_MODE_INPUT);
+    gpio_sleep_set_pull_mode((gpio_num_t)RX, GPIO_PULLUP_ONLY);
+    uart_set_wakeup_threshold(UART_NUM_0, 3);  // 3 edges on U0RXD to wakeup
+    uart_set_wakeup_threshold(UART_NUM_1, 3);  // 3 edges on U0RXD to wakeup
+    uart_set_wakeup_threshold(UART_NUM_2, 3);  // 3 edges on U0RXD to wakeup
     esp_sleep_enable_uart_wakeup(UART_NUM_0);
+    esp_sleep_enable_uart_wakeup(UART_NUM_1);
+    esp_sleep_enable_uart_wakeup(UART_NUM_2);
+    delay(100);
     esp_light_sleep_start();
+    //Serial.begin(115200); // needs reinit
     Serial.println("woken");
     return true;
   }
@@ -1013,12 +1033,27 @@ bool processSerialCommand(String cmd_str) {
         return false;
       }
    }
+
+   if(cmd_str.startsWith("serial2 write")) {
+    setupBruceDaughterboard();
+    String args = cmd_str.substring(strlen("serial2 write"));
+    Serial2.println(args);  // wakeup
+    Serial2.flush();
+    return true;
+  }
+  
+   if(cmd_str.startsWith("serial2 read")) {
+    setupBruceDaughterboard();
+    String curr_line = "";
+    while (Serial2.available()) {
+      curr_line = Serial.readStringUntil('\n');
+      Serial2.println(curr_line);
+    }
+    return true;
+  }
+
   
 /* WIP
-   if(cmd_str.startsWith("rtl433")) {
-    rtl433_setup();  // TODO: avoid reinit
-    return rtl433_loop(10);
-  }
 */
   /*
   if(cmd_str.startsWith("mass_storage")) {

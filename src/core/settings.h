@@ -41,3 +41,5 @@ void getConfigs();
 void saveConfigs();
 
 void runClockLoop();
+
+bool setupBruceDaughterboard();

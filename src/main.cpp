@@ -118,7 +118,7 @@ void setup_gpio() {
   #if defined(BACKLIGHT)
   pinMode(BACKLIGHT, OUTPUT);
   #endif
-  initCC1101once(&sdcardSPI); // Sets GPIO in the CC1101 lib
+  if(RfModule==1) initCC1101once(&sdcardSPI); // Sets GPIO in the CC1101 lib
 }
 
 
@@ -403,8 +403,10 @@ void loop() {
     Serial.println("startWebUi");
     startWebUi(true);  // MEMO: will quit when checkEscPress
   #else
+  while(true) {
     handleSerialCommands();
-    delay(100);
+    delay(200);
+  }
   #endif
 }
 #endif

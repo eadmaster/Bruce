@@ -336,7 +336,7 @@ size_t getFileSize(FS &fs, String filepath) {
   return fileSize;
 }
 
-bool is_valid_ascii(const String &text) {
+bool isValidAscii(const String &text) {
     for (int i = 0; i < text.length(); i++) {
         char c = text[i];
         // Check if the character is within the printable ASCII range or is a newline/carriage return
@@ -362,7 +362,7 @@ String readDecryptedAesFile(FS &fs, String filepath) {
   
   /*
   // check if really plaintext
-  if(!is_valid_ascii(plaintext)) {
+  if(!isValidAscii(plaintext)) {
     // invalidate cached password -> will ask again on the next try
     cachedPassword = "";
     Serial.println("invalid password");
@@ -800,6 +800,8 @@ void viewFile(FS fs, String filepath) {
   if (!file) return;
 
   // TODO: detect binary file, switch to hex view
+  // String header=file.read(100); file.rewind();
+  // if(isValidAscii(header)) ...
 
   while (file.available()) {
     fileContent = file.readString();

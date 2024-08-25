@@ -604,7 +604,7 @@ async function CreateEncryptedFile(file, password){
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
     const encryptedContent = await window.crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv },
+        { name: 'AES-GCM', iv: iv, tagLength: 128 },
         key,
         fileArrayBuffer
     );

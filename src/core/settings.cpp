@@ -260,6 +260,25 @@ void setUIColor(){
     EEPROM.end();
 }
 
+
+bool setupBruceDaughterboard() {
+  Serial.printf("trying setting up 2nd serial port on pins RX=%d TX=%d\n",GROVE_SDA, GROVE_SCL);
+  //pinMode(GROVE_SDA, INPUT);
+  //pinMode(GROVE_SCL, OUTPUT);
+  Serial2.begin(115200, SERIAL_8N1, GROVE_SDA, GROVE_SCL); // RXD2=2=GROVE_SDA, TXD2=1=GROVE_SCL
+  //Serial2.setRxTimeout(uint8_t symbols_timeout)
+  Serial2.println("info device");  // check bruce version
+  Serial2.flush();
+  delay(1000);
+  if (Serial2.available() >= 1) {
+    String r = Serial2.readStringUntil('\n');
+    Serial.println("daughterboard response: " + r);
+    if(r.startsWith("Bruce")) return true;
+  }
+  // else 
+  return false;
+}
+
 /*********************************************************************
 **  Function: setRFModuleMenu
 **  Handles Menu to set the RF module in use
@@ -304,25 +323,13 @@ void setRFModuleMenu() {
   }
   if(result == 2) {
     // open and check uart connection
-    Serial.printf("trying setting up 2nd serial port on pins RX=%d TX=%d\n",GROVE_SDA, GROVE_SCL);
-    pinMode(GROVE_SDA, INPUT);
-    pinMode(GROVE_SCL, OUTPUT);
-    Serial2.begin(115200, SERIAL_8N1, GROVE_SDA, GROVE_SCL); // RXD2=2=GROVE_SDA, TXD2=1=GROVE_SCL
-    //Serial2.setRxTimeout(uint8_t symbols_timeout)
-    Serial2.println("info device");  // check bruce version
-    Serial2.flush();
-    delay(2000);
-    if (Serial2.available() >= 1) {
-      String r = Serial2.readStringUntil('\n');
-      Serial.println("daugherboard response: " + r);
-      if(r.startsWith("Bruce")) {
-        // Bruce daugherboard found
-        RfModule=2;
-        EEPROM.write(13, RfModule); //set the byte
-        EEPROM.commit(); // Store data to EEPROM
-        EEPROM.end(); // Free EEPROM memory 
-        return;
-      }
+    if(setupBruceDaughterboard())  {
+      // Bruce daugherboard found
+      RfModule=2;
+      EEPROM.write(13, RfModule); //set the byte
+      EEPROM.commit(); // Store data to EEPROM
+      EEPROM.end(); // Free EEPROM memory 
+      return;
     }
     // else display an error
     displayError("Bruce not found on UART");
