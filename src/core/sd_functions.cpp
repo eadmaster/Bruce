@@ -339,17 +339,6 @@ size_t getFileSize(FS &fs, String filepath) {
   return fileSize;
 }
 
-bool isValidAscii(const String &text) {
-  for (int i = 0; i < text.length(); i++) {
-      char c = text[i];
-      // Check if the character is within the printable ASCII range or is a newline/carriage return
-      if (!(c >= 32 && c <= 126) && c != 10 && c != 13) {
-          return false; // Invalid character found
-      }
-  }
-  return true; // All characters are valid
-}
-
 String md5File(FS &fs, String filepath) {
   if(!fs.exists(filepath)) return "";
   String txt = readSmallFile(fs, filepath);
@@ -371,35 +360,6 @@ String crc32File(FS &fs, String filepath) {
   snprintf(s, sizeof(s), "%02X%02X%02X%02X\n", crcBytes[3], crcBytes[2], crcBytes[1], crcBytes[0]);
   return(String(s));
 }
-
-String readDecryptedFile(FS &fs, String filepath) {
-  String cyphertext = readSmallFile(fs, filepath);
-  if(cyphertext.length() == 0) return "";
-  
-  if(cachedPassword.length()==0) {
-    cachedPassword = keyboard("", 32, "password");
-    if(cachedPassword.length()==0) return "";  // cancelled
-  }
-  
-  //Serial.println(cyphertext);
-  //Serial.println(cachedPassword);
-  
-  // else try to decrypt
-  String plaintext = decryptString(cyphertext, cachedPassword);
-  
-  // check if really plaintext
-  if(!isValidAscii(plaintext)) {
-    // invalidate cached password -> will ask again on the next try
-    cachedPassword = "";
-    Serial.println("invalid password");
-    //Serial.println(plaintext);
-    return "";
-  }
-  
-  // else
-  return plaintext;
-}
-
 
 /***************************************************************************************
 ** Function name: sortList
@@ -673,7 +633,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
           if(filepath.endsWith(".enc")) {  // encrypted files
               options.insert(options.begin(), {"Decrypt+Type",  [&]() { 
                   String plaintext = readDecryptedFile(fs, filepath);
-                  if(plaintext.length()==0)   // file is too big or cannot read, or cancelled
+                  if(plaintext.length()==0) return displayError("Decryption failed");  // file is too big or cannot read, or cancelled
                   // else
                   key_input_from_string(plaintext);
               }});
@@ -684,7 +644,6 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
                 String plaintext = readDecryptedFile(fs, filepath);
                 delay(200);
                 if(plaintext.length()==0) return displayError("Decryption failed");
-
                 //if(plaintext.length()<..)
                   displaySuccess(plaintext);
                   while(!checkAnyKeyPress()) delay(100);

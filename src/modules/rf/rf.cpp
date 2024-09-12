@@ -567,9 +567,13 @@ RestartRec:
         if(received.key>0) {
             #ifndef HAS_SCREEN
                 // switch to raw mode if decoding failed
-                if(received.preset == 0) raw = true;
-                // TODO: show a dialog/warning?
-                // { bool raw = yesNoDialog("decoding failed, save as RAW?") }
+                if(received.preset == 0) {
+                    displayWarning("signal decoding failed, switcing to RAW mode");
+                    delay(2000);
+                    raw = true;
+                    // TODO: show a dialog/warning?
+                    // raw = yesNoDialog("decoding failed, save as RAW?");
+                }
             #endif
             
             String subfile_out = "Filetype: Bruce SubGhz File\nVersion 1\n";

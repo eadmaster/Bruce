@@ -119,9 +119,13 @@ void IrRead::read_signal() {
     _read_signal = true;
     
     // switch to raw mode if decoding failed
-    if(results.decode_type == decode_type_t::UNKNOWN ) raw = true;
-    // TODO: show a dialog/warning?
-    // { bool raw = yesNoDialog("decoding failed, save as RAW?") }
+    if(results.decode_type == decode_type_t::UNKNOWN ) {
+        displayWarning("signal decoding failed, switcing to RAW mode");
+        delay(2000);
+        raw = true;
+        // TODO: show a dialog
+        // raw = yesNoDialog("decoding failed, save as RAW?");
+    }
 
     display_banner();
     

@@ -179,21 +179,21 @@ bool processSerialCommand(String cmd_str) {
 
   // check cmd aliases
   if(cmd_str == "ls") cmd_str.replace("ls", "storage list /");
-  if(cmd_str.startsWith("ls ")) cmd_str.replace("ls ", "storage list ");
-  if(cmd_str.startsWith("dir ")) cmd_str.replace("dir ", "storage list ");
-  if(cmd_str.startsWith("rm ")) cmd_str.replace("rm ", "storage remove ");
-  if(cmd_str.startsWith("del ")) cmd_str.replace("del ", "storage remove ");
-  if(cmd_str.startsWith("md ")) cmd_str.replace("md ", "storage mkdir ");
-  if(cmd_str.startsWith("cat ")) cmd_str.replace("cat ", "storage read ");
-  if(cmd_str.startsWith("type ")) cmd_str.replace("type ", "storage read ");
-  if(cmd_str.startsWith("md5 ")) cmd_str.replace("md5 ", "storage md5 ");
-  if(cmd_str.startsWith("crc32 ")) cmd_str.replace("crc32 ", "storage crc32 ");
-  if(cmd_str.startsWith("play ")) cmd_str.replace("play ", "music_player ");
-  if(cmd_str.startsWith("rf ")) cmd_str.replace("rf ", "subghz ");
-  if(cmd_str.startsWith("bu ")) cmd_str.replace("bu ", "badusb ");
-  if(cmd_str.startsWith("set ")) cmd_str.replace("set ", "settings ");
-  if(cmd_str.startsWith("decrypt ")) cmd_str.replace("decrypt ", "crypto decrypt_from_file ");
-  if(cmd_str.startsWith("run ")) cmd_str.replace("run ", "js ");
+  if(cmd_str.startsWith("ls ")) cmd_str = "storage list " + cmd_str.substring(strlen("ls "));
+  if(cmd_str.startsWith("dir ")) cmd_str = "storage list " + cmd_str.substring(strlen("dir "));
+  if(cmd_str.startsWith("rm ")) cmd_str = "storage remove " + cmd_str.substring(strlen("rm "));
+  if(cmd_str.startsWith("del ")) cmd_str = "storage remove " + cmd_str.substring(strlen("del "));
+  if(cmd_str.startsWith("md ")) cmd_str = "storage mkdir " + cmd_str.substring(strlen("md "));
+  if(cmd_str.startsWith("cat ")) cmd_str = "storage read " + cmd_str.substring(strlen("cat "));
+  if(cmd_str.startsWith("type ")) cmd_str = "storage read " + cmd_str.substring(strlen("type "));
+  if(cmd_str.startsWith("md5 ")) cmd_str = "storage md5 " + cmd_str.substring(strlen("md5 "));
+  if(cmd_str.startsWith("crc32 ")) cmd_str = "storage crc32 " + cmd_str.substring(strlen("crc32 "));
+  if(cmd_str.startsWith("play ")) cmd_str = "music_player " + cmd_str.substring(strlen("play "));
+  if(cmd_str.startsWith("rf ")) cmd_str = "subghz " + cmd_str.substring(strlen("rf "));
+  if(cmd_str.startsWith("bu ")) cmd_str = "badusb " + cmd_str.substring(strlen("bu "));
+  if(cmd_str.startsWith("set ")) cmd_str = "settings " + cmd_str.substring(strlen("set "));
+  if(cmd_str.startsWith("decrypt ")) cmd_str = "crypto decrypt_from_file " + cmd_str.substring(strlen("decrypt "));
+  if(cmd_str.startsWith("run ")) cmd_str = "js " + cmd_str.substring(strlen("run "));
 
   // case-insensitive matching only in some cases -- TODO: better solution for this
   if(cmd_str.indexOf("from_file ") == -1 && cmd_str.indexOf("storage ") == -1 && cmd_str.indexOf("settings ") && cmd_str.indexOf("js "))
@@ -1065,7 +1065,7 @@ bool processSerialCommand(String cmd_str) {
   }
   
   if(cmd_str.startsWith("crypto ")) {
-    // crypto decrypt_from_file passwords/test.txt.enc 123
+    // crypto decrypt_from_file passwords/github.com.txt.enc 1234
     // crypto encrypt_to_file passwords/test.txt.enc 123
     String args = "";
     if(cmd_str.startsWith("crypto decrypt_from_file "))
@@ -1145,7 +1145,14 @@ bool processSerialCommand(String cmd_str) {
       }
    }
   
+   
 /* WIP
+   if(cmd_str.startsWith("bt scan")) {
+   }
+
+   if(cmd_str.startsWith("wifi scan")) {
+   }
+
    if(cmd_str.startsWith("rtl433")) {
     // https://github.com/pr3y/Bruce/issues/192
     rtl433_setup();
