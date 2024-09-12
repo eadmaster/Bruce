@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# args checking
+if [ -z "$1" ] || [ ! -f "$1" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	echo "usage: $(basename $0) INPUT_FILE"
+	echo
+	exit 0
+fi
+
+
+INPUTFILE="$1"
+
+# check file size
+if [ $(stat -c%s "$INPUTFILE") -gt 4000 ]; then
+	echo "input file is too big (max 4kb)"
+	exit 1
+fi
+
+echo "stoarage write" | busybox microcom -s 115200 /dev/ttyACM0 -t 1000
+
+sleep 1
+
+cat "$INPUTFILE" | busybox microcom -s 115200 /dev/ttyACM0 -t 1000
+
+echo "EOF" | busybox microcom -s 115200 /dev/ttyACM0
