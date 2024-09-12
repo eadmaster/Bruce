@@ -38,9 +38,11 @@ void OthersMenu::optionsMenu() {
     #ifndef LITE_VERSION
         {"Openhaystack", [=]()  { openhaystack_setup(); }},
     #endif
+    /*
     #if !defined(CORE) && !defined(CORE2)
         {"Interpreter", [=]()   { run_bjs_script(); }},
     #endif
+    * */
         {"Main Menu",    [=]()  { backToMenu(); }},
     };
 

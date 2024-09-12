@@ -920,6 +920,7 @@ bool interpreter() {
         duk_push_c_function(ctx, native_dialogPickFile, 1);
         duk_put_global_string(ctx, "dialogPickFile");
         // TODO: dialogChoice(choices: array)
+        // TODO: dialogYesNo()
         duk_push_c_function(ctx, native_dialogViewFile, 1);
         duk_put_global_string(ctx, "dialogViewFile");
         duk_push_c_function(ctx, native_keyboard, 3);
@@ -991,6 +992,8 @@ bool run_bjs_script_headless(String code) {
 }
 
 bool run_bjs_script_headless(FS fs, String filename) {
-    String code = readScriptFile(fs, filename);
-    return run_bjs_script_headless(code);
+    script = readScriptFile(fs, filename);
+    returnToMenu=true;
+    interpreter_start=true;
+    return true;
 }
