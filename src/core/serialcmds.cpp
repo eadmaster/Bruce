@@ -193,6 +193,7 @@ bool processSerialCommand(String cmd_str) {
   if(cmd_str.startsWith("bu ")) cmd_str = "badusb " + cmd_str.substring(strlen("bu "));
   if(cmd_str.startsWith("set ")) cmd_str = "settings " + cmd_str.substring(strlen("set "));
   if(cmd_str.startsWith("decrypt ")) cmd_str = "crypto decrypt_from_file " + cmd_str.substring(strlen("decrypt "));
+  if(cmd_str.startsWith("encrypt ")) cmd_str = "crypto encrypt_to_file " + cmd_str.substring(strlen("encrypt "));
   if(cmd_str.startsWith("run ")) cmd_str = "js " + cmd_str.substring(strlen("run "));
 
   // case-insensitive matching only in some cases -- TODO: better solution for this
@@ -398,6 +399,22 @@ bool processSerialCommand(String cmd_str) {
       if(!initRfModule("tx", float(frequency/1000000.0))) return false;  // check valid frequency and init the rf module
       RCSwitch_send( key, bits, te, 1, count );
       deinitRfModule();
+      return true;
+    }
+    
+    if(cmd_str.startsWith("subghz scan")) {
+      // subghz scan 433 434
+      String args = cmd_str.substring(cmd_str.indexOf(" ", strlen("subghz rx")));
+      float start_frequency=0;  // global default
+      float stop_frequency=0;  // global default
+      if(args.length()>1) {
+        sscanf(args.c_str(), " %f %f", &start_frequency, &stop_frequency);
+        if(!start_frequency || !stop_frequency) return false;  // invalid args
+        // passed as a long int (e.g. 433920000)
+        start_frequency /= 1000000; 
+        stop_frequency /= 1000000; 
+      } else return false;  // missing args
+      rf_scan(start_frequency, stop_frequency, 10*1000);  // 10s timeout
       return true;
     }
     
@@ -1066,10 +1083,12 @@ bool processSerialCommand(String cmd_str) {
   
   if(cmd_str.startsWith("crypto ")) {
     // crypto decrypt_from_file passwords/github.com.txt.enc 1234
-    // crypto encrypt_to_file passwords/test.txt.enc 123
+    // crypto encrypt_to_file passwords/github.com.txt.enc 1234
     String args = "";
     if(cmd_str.startsWith("crypto decrypt_from_file "))
       args = cmd_str.substring(strlen("crypto decrypt_from_file "));
+    else if(cmd_str.startsWith("crypto type_from_file "))
+      args = cmd_str.substring(strlen("crypto type_from_file "));
     else if(cmd_str.startsWith("crypto encrypt_to_file "))
       args = cmd_str.substring(strlen("crypto encrypt_to_file "));
     String filepath = args.substring(0, args.indexOf(" "));
@@ -1083,7 +1102,7 @@ bool processSerialCommand(String cmd_str) {
     //Serial.println(filepath);
     //Serial.println(password);
     
-    if(cmd_str.startsWith("crypto decrypt_from_file")) {
+    if(cmd_str.startsWith("crypto decrypt_from_file") || cmd_str.startsWith("crypto type_from_file")) {
       FS* fs = NULL;
       if(SD.exists(filepath)) fs = &SD;
       if(LittleFS.exists(filepath)) fs = &LittleFS;
@@ -1091,6 +1110,9 @@ bool processSerialCommand(String cmd_str) {
       String plaintext = readDecryptedFile(*fs, filepath);
       if(plaintext=="") return false;
       Serial.println(plaintext);
+      if(cmd_str.startsWith("crypto decrypt_from_file")) return true;
+      // else cmd_str.startsWith("crypto type_from_file")
+      key_input_from_string(plaintext);
       return true;
     }
     else if(cmd_str.startsWith("crypto encrypt_to_file")) {

@@ -9,6 +9,25 @@
 
 
 
+String xorEncryptDecryptMD5(const String &input, const String &password) {
+  uint8_t md5Hash[16];
+  
+  MD5Builder md5;
+  md5.begin();
+  md5.add(password);
+  md5.calculate();
+  md5.getBytes(md5Hash);  // Store MD5 hash in the output array
+  
+  String output = input;  // Copy input to output for modification
+  for (size_t i = 0; i < input.length(); i++) {
+    output[i] = input[i] ^ md5Hash[i % 16];  // XOR each byte with the MD5 hash
+  }
+
+  return output;
+}
+
+
+
 bool isValidAscii(const String &text) {
   for (int i = 0; i < text.length(); i++) {
       char c = text[i];
@@ -20,8 +39,8 @@ bool isValidAscii(const String &text) {
   return true; // All characters are valid
 }
 
-
-String readDecryptedFile(FS &fs, String filepath) {
+/* OLD:
+String readDecryptedFileOLD(FS &fs, String filepath) {
   String cyphertext = readSmallFile(fs, filepath);
   if(cyphertext.length() == 0) return "";
   
@@ -48,32 +67,116 @@ String readDecryptedFile(FS &fs, String filepath) {
   // else
   return plaintext;
 }
+*/
 
-
-String xorEncryptDecrypt(const String &input, const String &password) {
-  uint8_t md5Hash[16];
+#include "modules/rf/rf.h" //for hexCharToDecimal
+    
+String readDecryptedFile(FS &fs, String filepath) {
   
-  MD5Builder md5;
-  md5.begin();
-  md5.add(password);
-  md5.calculate();
-  md5.getBytes(md5Hash);  // Store MD5 hash in the output array
-  
-  String output = input;  // Copy input to output for modification
-  for (size_t i = 0; i < input.length(); i++) {
-    output[i] = input[i] ^ md5Hash[i % 16];  // XOR each byte with the MD5 hash
+  if(cachedPassword.length()==0) {
+    cachedPassword = keyboard("", 32, "password");
+    if(cachedPassword.length()==0) return "";  // cancelled
   }
+  
+  File cyphertextFile = fs.open(filepath, FILE_READ);
+  if(!cyphertextFile) return "";
+  
+  String line;
+  String cypertextData = "";
+  String plaintext = "";
+  bool unsupported_params = false;
+  
+  while (cyphertextFile.available() ) {
+      line = cyphertextFile.readStringUntil('\n');
+      if(line.startsWith("Filetype:") && !line.endsWith("Bruce Encrypted File")) unsupported_params = true;
+      if(line.startsWith("Algo:") && !line.endsWith("XOR")) unsupported_params = true;
+      if(line.startsWith("KeyDerivationAlgo:") && !line.endsWith("MD5")) unsupported_params = true;
+      if(line.startsWith("KeyDerivationPasses:") && !line.endsWith("1")) unsupported_params = true;
+      if(line.startsWith("Data:")) cypertextData = line.substring(strlen("Data:"));
+  }
+  
+  cyphertextFile.close();
+  
+  if(unsupported_params || cypertextData.length() == 0) {
+    Serial.println("err: invalid Encrypted file (altered?)");
+    return "";
+  }
+    
+  // else try decrypting
+  cypertextData.trim();
+  String cypertextDataDec = "";
+  cypertextDataDec.reserve(cypertextData.length());
+  
+  uint8_t decimal = 0;
+  char temp[3];   // Temporary storage for each hex pair
+  
+  for (int i = 0; i < cypertextData.length(); i += 3) {
+    // Converts two characters hex to a single byte
+    
+    uint8_t highNibble = hexCharToDecimal(cypertextData[i]);
+    uint8_t lowNibble = hexCharToDecimal(cypertextData[i + 1]);
+    decimal = (highNibble << 4) | lowNibble;
+    
+    //Serial.println((char) decimal);
+    
+    //cypertextDataDec += decimal;
+    //cypertextDataDec_index += 1;
+    
+    //temp[0] = cypertextData[i];        // First hex nibble
+    //temp[1] = cypertextData[i + 1];    // Second hex nibble
+    //temp[2] = '\0';                // Null-terminate the string
 
-  return output;
+    // Convert the hex pair to a byte (char)
+    //char decimal = (char) strtol(temp, NULL, 16);
+    /*
+    cypertextDataDec[i/3] = decimal;
+    */
+    cypertextDataDec += (char) decimal;
+    //Serial.println(decimal);
+  }
+  
+  //Serial.println(cachedPassword);
+  //Serial.println(cypertextData);
+  //Serial.println(cypertextDataDec);
+  
+  plaintext = xorEncryptDecryptMD5(cypertextDataDec, cachedPassword);
+  
+  if(!isValidAscii(plaintext)) {
+    // invalidate cached password -> will ask again on the next try
+    cachedPassword = "";
+    Serial.println("err: decryption failed (invalid password?)");
+    //Serial.println(plaintext);
+    return "";
+  }
+  //else
+  return(plaintext);
 }
+  
 
+//void writeEncryptedFile(FS &fs, String filepath, String& plaintext)
 
 
 String encryptString(String& plaintext, const String& password_str) {
-  // TODO: add "XOR" header
-  return xorEncryptDecrypt(plaintext, password_str);
+  String dataStr = xorEncryptDecryptMD5(plaintext, password_str);
+  String dataStrHex = "";
+  
+  for (size_t i = 0; i < dataStr.length(); i++)
+    dataStrHex += String(dataStr[i], HEX) + " ";
+  dataStrHex.toUpperCase();
+  dataStrHex.trim();
+  
+  String out = "Filetype: Bruce Encrypted File\nVersion 1\n";
+  out += "Algo: XOR\n";  // TODO: add AES
+  out += "KeyDerivationAlgo: MD5\n";
+  out += "KeyDerivationPasses: 1\n"; // TODO: allow more passes
+  out += "Data: " + dataStrHex + "\n";
+  
+  return out;
 }
 
-String decryptString(String& cypertext, const String& password_str) {
-  return xorEncryptDecrypt(cypertext, password_str);
+/* OLD:
+String decryptString(String& cypertext, const String& password_str) 
+  
+  return xorEncryptDecryptMD5(cypertextData, password_str);
 }
+*/
