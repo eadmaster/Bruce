@@ -217,6 +217,14 @@ void IrRead::append_to_file_str(String btn_name) {
                     strDeviceContent += "protocol: SIRC\n";
                 break;
             }
+            case decode_type_t::PANASONIC:
+            {
+                strDeviceContent += "protocol: Panasonic\n";
+                // not supported by flipper
+                //strDeviceContent += "value: " + uint32ToString( (uint32_t )results.value) + "\n";
+                // cast from uint64_t 
+                break;
+            }
             case decode_type_t::NEC:
             {
                 // check address and command ranges to find the exact protocol
@@ -233,7 +241,8 @@ void IrRead::append_to_file_str(String btn_name) {
             // TODO: more protocols?
             default:
             {
-                Serial.println("unsupported protocol, try raw mode");
+                Serial.print("unsupported protocol, try raw mode: ");
+                Serial.println(results.decode_type);
                 return;  
             }
         }
@@ -308,9 +317,11 @@ String IrRead::loop_headless(int max_loops) {
         Serial.println("# decoding failed, try raw mode");
         return "";
     }
+    
+    // TODO: check results.overflow, results.repeat
 
-    String r = "Filetype: Bruce IR File\n";
-    r += "Version 1\n";
+    String r = "Filetype: IR signals file\n";
+    r += "Version: 1\n";
     r += "#\n";
     r += "#\n";
     
@@ -337,8 +348,8 @@ bool IrRead::write_file(String filename, FS* fs) {
         return false;
     }
 
-    file.println("Filetype: Bruce IR File");
-    file.println("Version 1");
+    file.println("Filetype: IR signals file");
+    file.println("Version: 1");
     file.println("#");
     file.println("# " + filename);
     file.print(strDeviceContent);

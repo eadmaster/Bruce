@@ -125,7 +125,7 @@ bool is_free_gpio_pin(int pin_no ){
     usable_pins.insert(usable_pins.end(), {
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  // GPIO1 to GPIO25
       33,                                                                                        // GPIO33
-      38, 39, 40, 41, 42, 43, 44,                                                                // GPIO38 to GPIO44
+      38, 39, 40, 41, 42,                                                                         // GPIO38 to GPIO42
       47, 48                                                                                     // GPIO47 to GPIO48
     });
   #endif
@@ -163,6 +163,8 @@ void handleSerialCommands() {
   if(r) setup_gpio(); // temp fix for menu inf. loop
   else Serial.println("failed: " + cmd_str);
   
+  Serial.print("$ ");  // prompt
+  
   returnToMenu = true; // forced menu redrawn
 }
 
@@ -178,7 +180,8 @@ bool processSerialCommand(String cmd_str) {
   }
 
   // check cmd aliases
-  if(cmd_str == "ls") cmd_str.replace("ls", "storage list /");
+  if(cmd_str == "ls") cmd_str = "storage list ";
+  if(cmd_str == "dir") cmd_str = "storage list ";
   if(cmd_str.startsWith("ls ")) cmd_str = "storage list " + cmd_str.substring(strlen("ls "));
   if(cmd_str.startsWith("dir ")) cmd_str = "storage list " + cmd_str.substring(strlen("dir "));
   if(cmd_str.startsWith("rm ")) cmd_str = "storage remove " + cmd_str.substring(strlen("rm "));
@@ -195,6 +198,8 @@ bool processSerialCommand(String cmd_str) {
   if(cmd_str.startsWith("decrypt ")) cmd_str = "crypto decrypt_from_file " + cmd_str.substring(strlen("decrypt "));
   if(cmd_str.startsWith("encrypt ")) cmd_str = "crypto encrypt_to_file " + cmd_str.substring(strlen("encrypt "));
   if(cmd_str.startsWith("run ")) cmd_str = "js " + cmd_str.substring(strlen("run "));
+  if(cmd_str == "poweroff") cmd_str = "power off";
+  if(cmd_str == "reboot") cmd_str = "power reboot";
 
   // case-insensitive matching only in some cases -- TODO: better solution for this
   if(cmd_str.indexOf("from_file ") == -1 && cmd_str.indexOf("storage ") == -1 && cmd_str.indexOf("settings ") && cmd_str.indexOf("js "))
@@ -625,6 +630,7 @@ bool processSerialCommand(String cmd_str) {
     startWebUi(true);  // MEMO: will quit when checkEscPress
     return true;
   }
+  //TODO: if(cmd_str == "webui stop" ) {
 
 /*  
    // WIP https://github.com/pr3y/Bruce/issues/162#issuecomment-2308788115
@@ -944,7 +950,7 @@ bool processSerialCommand(String cmd_str) {
     // storage list BruceRF
     String filepath = cmd_str.substring(strlen("storage list "));
     filepath.trim();
-    if(filepath.length()==0) return false;  // missing arg
+    //if(filepath.length()==0) return false;  // missing arg
     if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
     FS* fs = NULL;
     if(SD.exists(filepath)) fs = &SD;
@@ -1167,12 +1173,17 @@ bool processSerialCommand(String cmd_str) {
       }
    }
   
-   
-/* WIP
-   if(cmd_str.startsWith("bt scan")) {
+   if(cmd_str == "wifi off") {
+     wifiDisconnect();
+     return true;
    }
 
-   if(cmd_str.startsWith("wifi scan")) {
+     
+/* WIP
+   if(cmd_str.startsWith("wifi scan") || cmd_str.startsWith("scanap") {
+   }
+   
+   if(cmd_str.startsWith("bt scan")) {
    }
 
    if(cmd_str.startsWith("rtl433")) {

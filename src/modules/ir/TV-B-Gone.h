@@ -71,5 +71,6 @@ void sendRC5Command(String address, String command);
 void sendRC6Command(String address, String command);
 void sendSamsungCommand(String address, String command);
 void sendSonyCommand(String address, String command);
+void sendPanasonicCommand(String address, String data);
 void otherIRcodes();
 bool txIrFile(FS *fs, String filepath);

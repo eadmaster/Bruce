@@ -9,13 +9,18 @@
 
 
 
-String xorEncryptDecryptMD5(const String &input, const String &password) {
-  uint8_t md5Hash[16];
+String xorEncryptDecryptMD5(const String &input, const String &password, const int MD5_PASSES) {
   
   MD5Builder md5;
-  md5.begin();
-  md5.add(password);
-  md5.calculate();
+  String hash = password;
+  
+  for (int i = 0; i < MD5_PASSES; i++) {
+    md5.begin();
+    md5.add(hash);
+    md5.calculate();
+  }
+  
+  uint8_t md5Hash[16];
   md5.getBytes(md5Hash);  // Store MD5 hash in the output array
   
   String output = input;  // Copy input to output for modification
@@ -91,14 +96,14 @@ String readDecryptedFile(FS &fs, String filepath) {
       if(line.startsWith("Filetype:") && !line.endsWith("Bruce Encrypted File")) unsupported_params = true;
       if(line.startsWith("Algo:") && !line.endsWith("XOR")) unsupported_params = true;
       if(line.startsWith("KeyDerivationAlgo:") && !line.endsWith("MD5")) unsupported_params = true;
-      if(line.startsWith("KeyDerivationPasses:") && !line.endsWith("1")) unsupported_params = true;
+      if(line.startsWith("KeyDerivationPasses:") && !line.endsWith("10")) unsupported_params = true;  // TODO: parse
       if(line.startsWith("Data:")) cypertextData = line.substring(strlen("Data:"));
   }
   
   cyphertextFile.close();
   
   if(unsupported_params || cypertextData.length() == 0) {
-    Serial.println("err: invalid Encrypted file (altered?)");
+    displayError("err: invalid Encrypted file (altered?)");
     return "";
   }
     
@@ -139,12 +144,12 @@ String readDecryptedFile(FS &fs, String filepath) {
   //Serial.println(cypertextData);
   //Serial.println(cypertextDataDec);
   
-  plaintext = xorEncryptDecryptMD5(cypertextDataDec, cachedPassword);
+  plaintext = xorEncryptDecryptMD5(cypertextDataDec, cachedPassword, 10);
   
   if(!isValidAscii(plaintext)) {
     // invalidate cached password -> will ask again on the next try
     cachedPassword = "";
-    Serial.println("err: decryption failed (invalid password?)");
+    displayError("decryption failed (invalid password?)");
     //Serial.println(plaintext);
     return "";
   }
@@ -157,7 +162,7 @@ String readDecryptedFile(FS &fs, String filepath) {
 
 
 String encryptString(String& plaintext, const String& password_str) {
-  String dataStr = xorEncryptDecryptMD5(plaintext, password_str);
+  String dataStr = xorEncryptDecryptMD5(plaintext, password_str, 10);
   String dataStrHex = "";
   
   for (size_t i = 0; i < dataStr.length(); i++)
@@ -165,10 +170,10 @@ String encryptString(String& plaintext, const String& password_str) {
   dataStrHex.toUpperCase();
   dataStrHex.trim();
   
-  String out = "Filetype: Bruce Encrypted File\nVersion 1\n";
+  String out = "Filetype: Bruce Encrypted File\nVersion: 1\n";
   out += "Algo: XOR\n";  // TODO: add AES
   out += "KeyDerivationAlgo: MD5\n";
-  out += "KeyDerivationPasses: 1\n"; // TODO: allow more passes
+  out += "KeyDerivationPasses: 10\n";
   out += "Data: " + dataStrHex + "\n";
   
   return out;

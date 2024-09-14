@@ -366,6 +366,8 @@ bool txIrFile(FS *fs, String filepath) {
               sendSamsungCommand(address, command);
             } else if (protocol.startsWith("SIRC")) {
               sendSonyCommand(address, command);
+            } else if (protocol.startsWith("Panasonic")) {
+              sendPanasonicCommand(address, command);
             }
             protocol = "";
             address = "";
@@ -435,6 +437,7 @@ void otherIRcodes() {
       else if(selected_code.protocol=="RC6") sendRC6Command(selected_code.address, selected_code.command);
       else if(selected_code.protocol.startsWith("Samsung")) sendSamsungCommand(selected_code.address, selected_code.command);
       else if(selected_code.protocol=="SIRC") sendSonyCommand(selected_code.address, selected_code.command);
+      else if(selected_code.protocol=="Panasonic") sendPanasonicCommand(selected_code.address, selected_code.command);
     }
     return;
     // no need to proceed, go back
@@ -502,6 +505,7 @@ void otherIRcodes() {
     if(codes[i].protocol.startsWith("RC6"))    options.push_back({ codes[i].name.c_str(), [=](){ sendRC6Command(codes[i].address, codes[i].command); addToRecentCodes(codes[i]); }});
     if(codes[i].protocol.startsWith("Samsung")) options.push_back({ codes[i].name.c_str(), [=](){ sendSamsungCommand(codes[i].address, codes[i].command); addToRecentCodes(codes[i]); }});
     if(codes[i].protocol=="SIRC")   options.push_back({ codes[i].name.c_str(), [=](){ sendSonyCommand(codes[i].address, codes[i].command); addToRecentCodes(codes[i]); }});
+    if(codes[i].protocol=="Panasonic")   options.push_back({ codes[i].name.c_str(), [=](){ sendPanasonicCommand(codes[i].address, codes[i].command); addToRecentCodes(codes[i]); }});
   }
   options.push_back({ "Main Menu" , [&](){ exit=true; }});
   databaseFile.close();
@@ -587,6 +591,26 @@ void sendSonyCommand(String address, String command) {
   uint32_t data = irsend.encodeSony(nbits,commandValue,addressValue);
   irsend.sendSony(data,20,10);
   Serial.println("Sent Sony Command");
+  digitalWrite(IrTx, LED_OFF);
+}
+
+void sendPanasonicCommand(String address, String command) {
+  IRsend irsend(IrTx);  // Set the GPIO to be used to sending the message.
+  irsend.begin();
+  displayRedStripe("Sending..",TFT_WHITE,FGCOLOR);
+  uint8_t first_zero_byte_pos = address.indexOf("00", 2);
+  if(first_zero_byte_pos!=-1) address = address.substring(0, first_zero_byte_pos);
+  address.replace(" ", "");
+  command.replace(" ", "");
+  // TODO: needs endianess fix?
+  uint16_t addressValue = strtoul(address.c_str(), nullptr, 16);
+  uint32_t commandValue = strtoul(command.c_str(), nullptr, 16);  
+  //Serial.println(addressValue);
+  //Serial.println(commandValue);
+  irsend.sendPanasonic(addressValue, commandValue, 48, 10);
+  // sendPanasonic(const uint16_t address, const uint32_t data, const uint16_t nbits = kPanasonicBits, const uint16_t repeat = kNoRepeat);
+  delay(20);
+  Serial.println("Sent Panasonic Command");
   digitalWrite(IrTx, LED_OFF);
 }
 

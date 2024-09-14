@@ -27,7 +27,8 @@ void ScriptsMenu::optionsMenu() {
         String fileName = String(file2.name());
         if( ! fileName.endsWith(".js") && ! fileName.endsWith(".bjs")) continue;
         // else append to the choices
-        options.push_back({file2.name(), [=]() { run_bjs_script_headless(*fs, file2.path()); }});
+        String entry_title = String(file2.name()); entry_title = entry_title.substring(0, entry_title.lastIndexOf("."));  // remove the extension
+        options.push_back({entry_title.c_str(), [=]() { run_bjs_script_headless(*fs, file2.path()); }});
         file2 = root.openNextFile();
     }
     file2.close();

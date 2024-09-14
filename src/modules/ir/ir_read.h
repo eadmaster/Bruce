@@ -32,7 +32,7 @@ private:
 	bool _read_signal = false;
 	decode_results results;
 	uint16_t* rawcode;
-	int raw_data_len;
+	uint16_t raw_data_len;
 	int signals_read = 0;
 	String strDeviceContent = "";
 	bool headless = false;

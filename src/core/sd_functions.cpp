@@ -635,6 +635,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
                   String plaintext = readDecryptedFile(fs, filepath);
                   if(plaintext.length()==0) return displayError("Decryption failed");  // file is too big or cannot read, or cancelled
                   // else
+                  plaintext.trim();  // remove newlines
                   key_input_from_string(plaintext);
               }});
           }
@@ -644,6 +645,7 @@ String loopSD(FS &fs, bool filePicker, String allowed_ext) {
                 String plaintext = readDecryptedFile(fs, filepath);
                 delay(200);
                 if(plaintext.length()==0) return displayError("Decryption failed");
+                plaintext.trim();  // remove newlines
                 //if(plaintext.length()<..)
                   displaySuccess(plaintext);
                   while(!checkAnyKeyPress()) delay(100);
