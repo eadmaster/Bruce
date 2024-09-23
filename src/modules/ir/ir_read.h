@@ -12,7 +12,8 @@
 
 class IrRead {
 public:
-	IRrecv irrecv = IRrecv(IrRx);
+	//IRrecv irrecv = IRrecv(IrRx);
+	IRrecv irrecv = IRrecv(IrRx, SAFE_STACK_BUFFER_SIZE, 50);
 
 
 	/////////////////////////////////////////////////////////////////////////////////////

@@ -93,6 +93,7 @@ void displayError(String txt)   {
     return;
   #endif
   displayRedStripe(txt);
+  while(!checkAnyKeyPress()) delay(100);
 }
 
 void displayWarning(String txt) {
@@ -101,6 +102,7 @@ void displayWarning(String txt) {
     return;
   #endif
   displayRedStripe(txt, TFT_BLACK,TFT_YELLOW);
+  while(!checkAnyKeyPress()) delay(100);
 }
 
 void displayInfo(String txt)    {
@@ -108,7 +110,9 @@ void displayInfo(String txt)    {
     Serial.println("INFO: " + txt);
     return;
   #endif
+  // todo: add newlines to txt if too long
   displayRedStripe(txt, TFT_WHITE, TFT_BLUE);
+  while(!checkAnyKeyPress()) delay(100);
 }
 
 void displaySuccess(String txt) {
@@ -116,7 +120,9 @@ void displaySuccess(String txt) {
     Serial.println("SUCCESS: " + txt);
     return;
   #endif
+  // todo: add newlines to txt if too long
   displayRedStripe(txt, TFT_WHITE, TFT_DARKGREEN);
+  while(!checkAnyKeyPress()) delay(100);
 }
 
 void setPadCursor(int16_t padx, int16_t pady) {

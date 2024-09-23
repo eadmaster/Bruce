@@ -286,11 +286,6 @@ bool processSerialCommand(String cmd_str) {
       // TODO: rewrite using ArduinoJson parser?
       // TODO: decode "data" into "address, command" and use existing "send*Command" funcs
 
-      //IRsend irsend(IrTx);  //inverted = false
-      //Serial.println(IrTx);
-      IRsend irsend(IrTx,true);  // Set the GPIO to be used to sending the message.
-      //IRsend irsend(IrTx);  //inverted = false
-      irsend.begin();
       cJSON *root = cJSON_Parse(cmd_str.c_str() + 6);
       if (root == NULL) {
         Serial.println("This is NOT json format");
@@ -304,7 +299,12 @@ bool processSerialCommand(String cmd_str) {
       cJSON * dataItem = cJSON_GetObjectItem(root, "data");
       cJSON * bitsItem = cJSON_GetObjectItem(root,"bits");
 
-      if(protocolItem && cJSON_IsString(protocolItem)) protocolStr = protocolItem->valuestring;
+      if(protocolItem && cJSON_IsString(protocolItem)) {
+        protocolStr = protocolItem->valuestring;
+      }  else {
+        Serial.println("missing or invalid protocol to send");
+        return false;
+      }
       if(bitsItem && cJSON_IsNumber(bitsItem)) bits = bitsItem->valueint;
       if(dataItem && cJSON_IsString(dataItem)) {
         dataStr = dataItem->valuestring;
@@ -320,14 +320,15 @@ bool processSerialCommand(String cmd_str) {
       //Serial.println(protocolItem->valuestring);
 
       cJSON_Delete(root);
-
-      if(protocolStr == "nec"){
+      
+      /*if(protocolStr == "nec"){
         // sendNEC(uint64_t data, uint16_t nbits, uint16_t repeat)
         irsend.sendNEC(data, bits, 10);
         return true;
       }
-      // TODO: more protocols
-      return false;
+      */
+      
+      return sendDecodedCommand(protocolStr, dataStr, String(bits));
     }
 
     // turn off the led

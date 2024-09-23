@@ -216,7 +216,7 @@ String rf_scan(float start_freq, float stop_freq, int max_loops)
     // derived from https://github.com/mcore1976/cc1101-tool/blob/main/cc1101-tool-esp32.ino#L480
     
     if(RfModule != 1) {
-        Serial.println("ERR: rf scanning is available with CC1101 only");
+        displayError("rf scanning is available with CC1101 only");
         return ""; // only CC1101 is supported for this
     }
     if(!initRfModule("rx", start_freq)) return "";

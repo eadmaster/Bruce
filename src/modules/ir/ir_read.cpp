@@ -8,7 +8,7 @@
  */
 
 #include <IRrecv.h>
-//#include <IRutils.h>
+#include <IRutils.h>
 #include "ir_read.h"
 #include "core/globals.h"
 #include "core/mykeyboard.h"
@@ -17,7 +17,7 @@
 #include "core/settings.h"
 
 /* Dont touch this */
-#define MAX_RAWBUF_SIZE 300
+//#define MAX_RAWBUF_SIZE 300
 #define IR_FREQUENCY 38000
 #define DUTY_CYCLE 0.330000
 
@@ -158,23 +158,37 @@ void IrRead::save_signal() {
     delay(100);
 }
 
-String IrRead::parse_raw_signal() {
-    rawcode = new uint16_t[MAX_RAWBUF_SIZE];
-    memset(rawcode, 0, MAX_RAWBUF_SIZE * sizeof(uint16_t));
-    raw_data_len = results.rawlen;
-    String signal_code = "";
 
-    /* I HAVE NO FUCKING IDEA WHY WE NEED TO MULTIPLY BY 2, BUT WE DO. */
-    for (int i = 1; i < raw_data_len; i++) {
-        signal_code += String(results.rawbuf[i] * 2) + " ";
-        rawcode[i - 1] = results.rawbuf[i] * 2;
+String IrRead::parse_raw_signal() {
+    //rawcode = new uint16_t[MAX_RAWBUF_SIZE];
+    //memset(rawcode, 0, MAX_RAWBUF_SIZE * sizeof(uint16_t));
+    //raw_data_len = results.rawlen;
+    
+    // https://github.com/crankyoldgit/IRremoteESP8266/blob/master/examples/SmartIRRepeater/SmartIRRepeater.ino
+    rawcode = resultToRawArray(&results);
+    // Find out how many elements are in the array.
+    raw_data_len = getCorrectedRawLength(&results);
+    
+    String signal_code = "";
+    //String signal_code2 = "";
+
+    // I HAVE NO FUCKING IDEA WHY WE NEED TO MULTIPLY BY 2, BUT WE DO.
+    for (uint16_t i = 1; i < raw_data_len; i++) {
+        //signal_code2 += String(results.rawbuf[i] * 2) + " ";
+        //rawcode[i - 1] = results.rawbuf[i] * 2;
+        //Serial.println(results.rawbuf[i]);
+        //Serial.println(rawcode[i]);
+        signal_code += String(rawcode[i] * 2) + " ";
     }
     delete[] rawcode;
     rawcode = nullptr;
     signal_code.trim();
 
+    //Serial.println(raw_data_len);
+    //Serial.println("data2 " + signal_code2);
     return signal_code;
 }
+
 
 void IrRead::append_to_file_str(String btn_name) {
     strDeviceContent += "name: " + btn_name + "\n";
@@ -217,14 +231,6 @@ void IrRead::append_to_file_str(String btn_name) {
                     strDeviceContent += "protocol: SIRC\n";
                 break;
             }
-            case decode_type_t::PANASONIC:
-            {
-                strDeviceContent += "protocol: Panasonic\n";
-                // not supported by flipper
-                //strDeviceContent += "value: " + uint32ToString( (uint32_t )results.value) + "\n";
-                // cast from uint64_t 
-                break;
-            }
             case decode_type_t::NEC:
             {
                 // check address and command ranges to find the exact protocol
@@ -238,22 +244,39 @@ void IrRead::append_to_file_str(String btn_name) {
                     strDeviceContent +=  "protocol: NEC\n";
                 break;
             }
-            // TODO: more protocols?
+            case decode_type_t::UNKNOWN:
+            {
+                Serial.print("unknown protocol, try raw mode");
+                return;  
+            }
             default:
             {
-                Serial.print("unsupported protocol, try raw mode: ");
-                Serial.println(results.decode_type);
-                return;  
+                strDeviceContent +=  "protocol: " + typeToString(results.decode_type, results.repeat) + "\n";
+                break;
             }
         }
         //
         strDeviceContent +=  "address: " + uint32ToString(results.address) + "\n";
         strDeviceContent +=  "command: " + uint32ToString(results.command) + "\n";
         
-        //Serial.println("bits:");
-        //Serial.println(results.bits);
-        //Serial.println("value:");
-        //serialPrintUint64(results.value, HEX);
+        // extra fields not supported on flipper
+        if(results.bits>32)
+            strDeviceContent +=  "value: " + uint32ToString(results.value >> 32) + " " + uint32ToString(results.value) + "\n";  // MEMO: from uint64_t 
+        else
+            strDeviceContent +=  "value: " + uint32ToString(results.value) + "\n";
+        strDeviceContent +=  "bits: " + String(results.bits) + "\n";
+                        
+        /*
+        Serial.println("IR results:");
+        Serial.println(results.bits);
+        Serial.println(results.address);
+        Serial.println(results.command);
+        Serial.println(results.overflow);
+        Serial.println(results.repeat);
+        Serial.println("value:");
+        serialPrintUint64(results.address, HEX);
+        serialPrintUint64(results.command, HEX);
+        */
     }
     strDeviceContent += "#\n";
 }
@@ -301,13 +324,14 @@ void IrRead::save_device() {
 
 String IrRead::loop_headless(int max_loops) {    
     
-    while (!irrecv.decode(&results)) {
+    while (!irrecv.decode(&results)) {  // MEMO: default timeout is 15ms
         max_loops -= 1;
         if(max_loops <= 0) {
             Serial.println("timeout");
             return "";  // nothing received
         }
         delay(1000);
+        //delay(50);
     }
     
     irrecv.disableIRIn();
@@ -318,7 +342,8 @@ String IrRead::loop_headless(int max_loops) {
         return "";
     }
     
-    // TODO: check results.overflow, results.repeat
+    if(results.overflow) displayWarning("buffer overflow, data may be truncated");
+    // TODO: check results.repeat
 
     String r = "Filetype: IR signals file\n";
     r += "Version: 1\n";
@@ -326,7 +351,7 @@ String IrRead::loop_headless(int max_loops) {
     r += "#\n";
     
     strDeviceContent = "";
-    append_to_file_str("??");  // writes on strDeviceContent
+    append_to_file_str("Unknown");  // writes on strDeviceContent
     r += strDeviceContent;
     
     return r;

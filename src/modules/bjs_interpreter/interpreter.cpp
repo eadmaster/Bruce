@@ -61,13 +61,14 @@ static duk_ret_t native_getBattery(duk_context *ctx) {
     return 1;
 }
 
+/* 2FIX: not working
 // terminate the script
 static duk_ret_t native_exit(duk_context *ctx) {
   duk_error(ctx, DUK_ERR_ERROR, "Script exited");
   interpreter_start=false;
   return 0;
 }
-
+*/
 
 static duk_ret_t native_getBoard(duk_context *ctx) {
     String board = "Undefined";
@@ -644,14 +645,12 @@ static duk_ret_t native_subghzSetFrequency(duk_context *ctx) {
 static duk_ret_t native_dialogMessage(duk_context *ctx) {
   // usage: dialogMessage(msg : string)
   displayInfo(String(duk_to_string(ctx, 0)));
-  while(!checkAnyKeyPress()) delay(100);
   return 0;
 }
 
 static duk_ret_t native_dialogError(duk_context *ctx) {
   // usage: dialogError(msg : string)
   displayError(String(duk_to_string(ctx, 0)));
-  while(!checkAnyKeyPress()) delay(100);
   return 0;
 }
 
@@ -675,6 +674,56 @@ static duk_ret_t native_dialogPickFile(duk_context *ctx) {
   return 1;
 }
 
+static duk_ret_t native_dialogChoice(duk_context *ctx) {
+    // usage: dialogChoice(choices : string[])
+    // returns: string (val1, 2, ...), or empty string if cancelled
+    const char* r = "";
+    
+    if (duk_is_array(ctx, 0)) {
+        options = {
+            {"Cancel",     [&]() { r = ""; }},
+        };
+        
+        // Get the length of the array
+        duk_uint_t len = duk_get_length(ctx, 0);
+        for (duk_uint_t i = 0; i < len; i++) {
+            // Get each element in the array
+            duk_get_prop_index(ctx, 0, i);
+            
+            // Ensure it's a string
+            if (!duk_is_string(ctx, -1)) {
+                duk_pop(ctx);
+                duk_error(ctx, DUK_ERR_TYPE_ERROR, "Choice array elements must be strings.");
+            }
+
+            // Get the string
+            const char *choiceKey = duk_get_string(ctx, -1);
+            duk_pop(ctx);
+            i++;
+            duk_get_prop_index(ctx, 0, i);
+            
+            // Ensure it's a string
+            if (!duk_is_string(ctx, -1)) {
+                duk_pop(ctx);
+                duk_error(ctx, DUK_ERR_TYPE_ERROR, "Choice array elements must be strings.");
+            }
+
+            // Get the string
+            const char *choiceValue = duk_get_string(ctx, -1);
+            duk_pop(ctx);
+            
+            // add to the choices list
+            options.push_back({choiceKey, [&]() { r = choiceValue; }});
+        }  // end for
+        
+        delay(200);
+        loopOptions(options);
+      }
+      
+      duk_push_string(ctx, r);
+      return 1;
+}
+  
 static duk_ret_t native_dialogViewFile(duk_context *ctx) {
   // usage: dialogViewFile(path : string)
   // returns: nothing
@@ -800,8 +849,8 @@ bool interpreter() {
         duk_put_global_string(ctx, "digitalWrite");
         duk_push_c_function(ctx, native_pinMode, 2);
         duk_put_global_string(ctx, "pinMode");
-        duk_push_c_function(ctx, native_exit, 0);
-        duk_put_global_string(ctx, "exit");
+        //duk_push_c_function(ctx, native_exit, 0);
+        //duk_put_global_string(ctx, "exit");
 
         // Get Informations from the board
         duk_push_c_function(ctx, native_getBattery, 0);
@@ -917,10 +966,11 @@ bool interpreter() {
         duk_put_global_string(ctx, "dialogMessage");
         duk_push_c_function(ctx, native_dialogError, 1);
         duk_put_global_string(ctx, "dialogError");
+        // TODO: dialogYesNo()
         duk_push_c_function(ctx, native_dialogPickFile, 1);
         duk_put_global_string(ctx, "dialogPickFile");
-        // TODO: dialogChoice(choices: array)
-        // TODO: dialogYesNo()
+        duk_push_c_function(ctx, native_dialogChoice, 1);
+        duk_put_global_string(ctx, "dialogChoice");
         duk_push_c_function(ctx, native_dialogViewFile, 1);
         duk_put_global_string(ctx, "dialogViewFile");
         duk_push_c_function(ctx, native_keyboard, 3);
