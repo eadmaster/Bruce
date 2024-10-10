@@ -828,14 +828,22 @@ bool showJpeg(FS fs, String filename, int x, int y) {
 #include <AnimatedGIF.h>
 
 #define NORMAL_SPEED
+#define GIF_BUFFER_SIZE 100
 //#define USE_DMA
 
 #ifdef USE_DMA
-  uint16_t usTemp[2][SAFE_STACK_BUFFER_SIZE]; // Global to support DMA use
+  uint16_t usTemp[2][GIF_BUFFER_SIZE]; // Global to support DMA use
 #else
-  uint16_t usTemp[1][SAFE_STACK_BUFFER_SIZE];    // Global to support DMA use
+  uint16_t usTemp[1][GIF_BUFFER_SIZE];    // Global to support DMA use
 #endif
 bool     dmaBuf = 0;
+
+typedef struct gif_draw_params_struct
+{
+  int xoff, yoff; // corner offset
+  int angle; // rotation angle (0,1,2,3 = 0, 90, 180, 270)
+} gif_draw_params;
+
   
 // Draw a line of image directly on the LCD
 void GIFDraw(GIFDRAW *pDraw)
@@ -843,14 +851,19 @@ void GIFDraw(GIFDRAW *pDraw)
   uint8_t *s;
   uint16_t *d, *usPalette;
   int x, y, iWidth, iCount;
+  
+  // https://github.com/bitbank2/AnimatedGIF/blob/378e6d03c6551467c5a03083476c2fe1314e97ca/examples/gif_transparency_demo/gif_transparency_demo.ino#L42
+  gif_draw_params *pPriv = (gif_draw_params *)pDraw->pUser;
+  int startx = pPriv->xoff + startx;
+  int starty = pPriv->yoff + pDraw->iY + pDraw->y;
 
   // Display bounds check and cropping
   iWidth = pDraw->iWidth;
-  if (iWidth + pDraw->iX > WIDTH)
-    iWidth = WIDTH - pDraw->iX;
+  if (iWidth + startx > WIDTH)
+    iWidth = WIDTH - startx;
   usPalette = pDraw->pPalette;
-  y = pDraw->iY + pDraw->y; // current line
-  if (y >= HEIGHT || pDraw->iX >= WIDTH || iWidth < 1)
+  y = starty; // current line
+  if (y >= HEIGHT || startx >= WIDTH || iWidth < 1)
     return;
 
   // Old image disposal
@@ -876,7 +889,7 @@ void GIFDraw(GIFDRAW *pDraw)
     {
       c = ucTransparent - 1;
       d = &usTemp[0][0];
-      while (c != ucTransparent && s < pEnd && iCount < SAFE_STACK_BUFFER_SIZE )
+      while (c != ucTransparent && s < pEnd && iCount < GIF_BUFFER_SIZE )
       {
         c = *s++;
         if (c == ucTransparent) // done, stop
@@ -892,7 +905,7 @@ void GIFDraw(GIFDRAW *pDraw)
       if (iCount) // any opaque pixels?
       {
         // DMA would degrtade performance here due to short line segments
-        tft.setAddrWindow(pDraw->iX + x, y, iCount, 1);
+        tft.setAddrWindow(startx + x, y, iCount, 1);
         tft.pushPixels(usTemp, iCount);
         x += iCount;
         iCount = 0;
@@ -915,18 +928,18 @@ void GIFDraw(GIFDRAW *pDraw)
 
     // Unroll the first pass to boost DMA performance
     // Translate the 8-bit pixels through the RGB565 palette (already byte reversed)
-    if (iWidth <= SAFE_STACK_BUFFER_SIZE)
+    if (iWidth <= GIF_BUFFER_SIZE)
       for (iCount = 0; iCount < iWidth; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
     else
-      for (iCount = 0; iCount < SAFE_STACK_BUFFER_SIZE; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
+      for (iCount = 0; iCount < GIF_BUFFER_SIZE; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
 
 #ifdef USE_DMA // 71.6 fps (ST7796 84.5 fps)
     tft.dmaWait();
-    tft.setAddrWindow(pDraw->iX, y, iWidth, 1);
+    tft.setAddrWindow(startx, y, iWidth, 1);
     tft.pushPixelsDMA(&usTemp[dmaBuf][0], iCount);
     dmaBuf = !dmaBuf;
 #else // 57.0 fps
-    tft.setAddrWindow(pDraw->iX, y, iWidth, 1);
+    tft.setAddrWindow(startx, y, iWidth, 1);
     tft.pushPixels(&usTemp[0][0], iCount);
 #endif
 
@@ -935,10 +948,10 @@ void GIFDraw(GIFDRAW *pDraw)
     while (iWidth > 0)
     {
       // Translate the 8-bit pixels through the RGB565 palette (already byte reversed)
-      if (iWidth <= SAFE_STACK_BUFFER_SIZE)
+      if (iWidth <= GIF_BUFFER_SIZE)
         for (iCount = 0; iCount < iWidth; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
       else
-        for (iCount = 0; iCount < SAFE_STACK_BUFFER_SIZE; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
+        for (iCount = 0; iCount < GIF_BUFFER_SIZE; iCount++) usTemp[dmaBuf][iCount] = usPalette[*s++];
 
 #ifdef USE_DMA
       tft.dmaWait();
@@ -1005,18 +1018,22 @@ int32_t GIFSeekFile(GIFFILE *pFile, int32_t iPosition)
 }
 
 bool showGIF(FS fs, String filename, int x, int y) {
-#if defined(CARDPUTER)
+#if defined(CARDPUTER) 
   if(!fs.exists(filename))
     return false;
   static AnimatedGIF gif;  // MEMO: triggers stack canary if not static
   gif.begin(BIG_ENDIAN_PIXELS);
+  gif_draw_params priv;
+  priv.xoff = x;
+  priv.yoff = y;
+  priv.angle = 0;
   if( gif.open( filename.c_str(), GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw ) )
   {
     Serial.printf("Successfully opened GIF; Canvas size = %d x %d\n", gif.getCanvasWidth(), gif.getCanvasHeight());
     tft.startWrite(); // The TFT chip select is locked low
     // TODO: keep looping? pass x and y offsets
     // while(!checkAnyKeyPress() && ...)
-    while (gif.playFrame(true, NULL))  // MEMO: single-frame images will exit the loop after a while without pressing any key
+    while (gif.playFrame(true, NULL, &priv))  // MEMO: single-frame images will exit the loop after a while without pressing any key
     {
       yield();
       if(checkAnyKeyPress()) break;

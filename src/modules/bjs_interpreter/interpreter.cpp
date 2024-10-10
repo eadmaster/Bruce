@@ -317,7 +317,6 @@ static duk_ret_t native_height(duk_context *ctx) {
 }
 
 static duk_ret_t native_drawJpg(duk_context *ctx) {
-  // fill the screen with the passed color
   FS *fss;
   String fsss=duk_to_string(ctx,0);
   fsss.toLowerCase();
@@ -327,6 +326,26 @@ static duk_ret_t native_drawJpg(duk_context *ctx) {
 
   showJpeg(*fss,duk_to_string(ctx,1),duk_to_int(ctx,2),duk_to_int(ctx,3));
   return 0;
+}
+
+static duk_ret_t native_drawImage(duk_context *ctx) {
+  String filepath = duk_to_string(ctx,0);
+  if(!filepath.startsWith("/")) filepath = "/" + filepath;  // add "/" if missing
+  FS* fs = NULL;
+  if(SD.exists(filepath)) fs = &SD;
+  if(LittleFS.exists(filepath)) fs = &LittleFS;
+  if(!fs) {
+    duk_push_boolean(ctx, false);
+    return 1;
+  }
+  bool r = false;
+  if(filepath.endsWith(".jpg"))
+    r = showJpeg(*fs, filepath,duk_to_int(ctx,2),duk_to_int(ctx,3));
+  else if(filepath.endsWith(".gif"))
+    r = showGIF(*fs, filepath,duk_to_int(ctx,2),duk_to_int(ctx,3));
+  // TODO: bmp
+  duk_push_boolean(ctx, r);
+  return 1;
 }
 
 // Input functions
@@ -911,8 +930,8 @@ bool interpreter() {
         duk_put_global_string(ctx, "fillScreen");
         duk_push_c_function(ctx, native_drawJpg, 4); //drawJpg(fs,filepath,x,y)
         duk_put_global_string(ctx, "drawJpg");       //drawJpg("SD","/boot.jpg",10,10);
-
-        
+        duk_push_c_function(ctx, native_drawImage, 4);
+        duk_put_global_string(ctx, "drawImage");
 
         duk_push_c_function(ctx, native_width, 0);
         duk_put_global_string(ctx, "width");

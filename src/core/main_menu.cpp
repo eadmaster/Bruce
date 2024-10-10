@@ -68,7 +68,16 @@ void MainMenu::draw() {
     tft.fillRect(40, 40, WIDTH-70, HEIGHT-70, BGCOLOR);
     tft.setTextSize(FG);
 
-    current_menu->draw();
+    // draw the icon
+    String icon_filename = "/" + current_menu->getName() + ".gif";
+    icon_filename.toLowerCase();
+    int iconX = WIDTH/2 - 40;
+    int iconY = 27 + (HEIGHT-134)/2;
+    //Serial.println(iconX);
+    //Serial.println(iconY);
+    if(SD.exists(icon_filename)) showGIF(SD, icon_filename, iconX, iconY);
+    else if(LittleFS.exists(icon_filename)) showGIF(LittleFS, icon_filename, iconX, iconY);
+    else current_menu->draw();
 
     tft.setTextSize(FM);
     tft.fillRect(10,30+80+(HEIGHT-134)/2, WIDTH-20,LH*FM, BGCOLOR);
