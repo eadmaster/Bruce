@@ -825,6 +825,8 @@ bool showJpeg(FS fs, String filename, int x, int y) {
 // and https://github.com/bitbank2/AnimatedGIF/blob/master/examples/best_practices_example/best_practices_example.ino
 //####################################################################################################
 
+#if defined(CARDPUTER) 
+
 #include <AnimatedGIF.h>
 
 #define NORMAL_SPEED
@@ -853,17 +855,19 @@ void GIFDraw(GIFDRAW *pDraw)
   int x, y, iWidth, iCount;
   
   // https://github.com/bitbank2/AnimatedGIF/blob/378e6d03c6551467c5a03083476c2fe1314e97ca/examples/gif_transparency_demo/gif_transparency_demo.ino#L42
+  /* TODO: draw centered
   gif_draw_params *pPriv = (gif_draw_params *)pDraw->pUser;
-  int startx = pPriv->xoff + startx;
+  int startx = pPriv->xoff + pDraw->iX;
   int starty = pPriv->yoff + pDraw->iY + pDraw->y;
+  * */
 
   // Display bounds check and cropping
   iWidth = pDraw->iWidth;
-  if (iWidth + startx > WIDTH)
-    iWidth = WIDTH - startx;
+  if (iWidth + pDraw->iX > WIDTH)
+    iWidth = WIDTH - pDraw->iX;
   usPalette = pDraw->pPalette;
-  y = starty; // current line
-  if (y >= HEIGHT || startx >= WIDTH || iWidth < 1)
+  y = pDraw->iY + pDraw->y; // current line
+  if (y >= HEIGHT || pDraw->iX >= WIDTH || iWidth < 1)
     return;
 
   // Old image disposal
@@ -905,7 +909,7 @@ void GIFDraw(GIFDRAW *pDraw)
       if (iCount) // any opaque pixels?
       {
         // DMA would degrtade performance here due to short line segments
-        tft.setAddrWindow(startx + x, y, iCount, 1);
+        tft.setAddrWindow(pDraw->iX + x, y, iCount, 1);
         tft.pushPixels(usTemp, iCount);
         x += iCount;
         iCount = 0;
@@ -935,11 +939,11 @@ void GIFDraw(GIFDRAW *pDraw)
 
 #ifdef USE_DMA // 71.6 fps (ST7796 84.5 fps)
     tft.dmaWait();
-    tft.setAddrWindow(startx, y, iWidth, 1);
+    tft.setAddrWindow(pDraw->iX, y, iWidth, 1);
     tft.pushPixelsDMA(&usTemp[dmaBuf][0], iCount);
     dmaBuf = !dmaBuf;
 #else // 57.0 fps
-    tft.setAddrWindow(startx, y, iWidth, 1);
+    tft.setAddrWindow(pDraw->iX, y, iWidth, 1);
     tft.pushPixels(&usTemp[0][0], iCount);
 #endif
 
@@ -1016,6 +1020,7 @@ int32_t GIFSeekFile(GIFFILE *pFile, int32_t iPosition)
   //log_n("GIFSeekFile 2!");
   return pFile->iPos;
 }
+#endif
 
 bool showGIF(FS fs, String filename, int x, int y) {
 #if defined(CARDPUTER) 
