@@ -9,6 +9,7 @@
 #include "modules/rf/rf_send.h"
 #include "modules/rf/rf_spectrum.h"
 #include "modules/rf/rf_waterfall.h"
+#include "modules/rf/rtl433.h"
 
 void RFMenu::optionsMenu() {
     options = {
@@ -31,6 +32,12 @@ void RFMenu::optionsMenu() {
     String txt = "Radio Frequency";
     if (bruceConfig.rfModule == CC1101_SPI_MODULE) txt += " (CC1101)"; // Indicates if CC1101 is connected
     else txt += " Tx: " + String(bruceConfig.rfTx) + " Rx: " + String(bruceConfig.rfRx);
+
+#ifdef RF_CC1101
+    if (bruceConfig.rfModule == CC1101_SPI_MODULE) {
+        options.push_back({"Sensors", [=]() { rtl433_scan(); }});
+    }
+#endif
 
     loopOptions(options, MENU_TYPE_SUBMENU, txt.c_str());
 }

@@ -289,6 +289,8 @@ static const uint8_t SCL = GROVE_SCL;
 #define DEEPSLEEP_WAKEUP_PIN 0
 #define DEEPSLEEP_PIN_ACT LOW
 
+#define RADIOLIB_DEFAULT_SPI  tft.getSPIinstance()
+
 #endif /* Pins_Arduino_h */
 
 #endif

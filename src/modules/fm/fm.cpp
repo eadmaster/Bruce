@@ -4,7 +4,7 @@
 bool auto_scan = false;
 bool is_running = false;
 uint16_t fm_station = 10230; // Default set to 102.30 MHz
-Adafruit_Si4713 radio = Adafruit_Si4713();
+Adafruit_Si4713 fm_radio = Adafruit_Si4713();
 
 void set_auto_scan(bool new_value) { auto_scan = new_value; }
 
@@ -25,9 +25,9 @@ uint16_t fm_scan() {
     uint16_t freq_candidate = f;
 
     // Check for first noise level
-    radio.readTuneMeasure(f);
-    radio.readTuneStatus();
-    min_noise = radio.currNoiseLevel;
+    fm_radio.readTuneMeasure(f);
+    fm_radio.readTuneStatus();
+    min_noise = fm_radio.currNoiseLevel;
 
     tft.fillScreen(bruceConfig.bgColor);
     displayTextLine("Scanning...");
@@ -35,13 +35,13 @@ uint16_t fm_scan() {
         Serial.print("Measuring ");
         Serial.print(f);
         Serial.print("...");
-        radio.readTuneMeasure(f);
-        radio.readTuneStatus();
-        Serial.println(radio.currNoiseLevel);
+        fm_radio.readTuneMeasure(f);
+        fm_radio.readTuneStatus();
+        Serial.println(fm_radio.currNoiseLevel);
 
         // Set best freq candidate
-        if (radio.currNoiseLevel < min_noise) {
-            min_noise = radio.currNoiseLevel;
+        if (fm_radio.currNoiseLevel < min_noise) {
+            min_noise = fm_radio.currNoiseLevel;
             freq_candidate = f;
         }
     }
@@ -188,9 +188,9 @@ void fm_spectrum() {
         fm_begin();
         fm_banner();
         while (!check(EscPress) && !check(SelPress)) {
-            radio.readTuneMeasure(fm_station);
-            radio.readTuneStatus();
-            noise_level = radio.currNoiseLevel;
+            fm_radio.readTuneMeasure(fm_station);
+            fm_radio.readTuneStatus();
+            noise_level = fm_radio.currNoiseLevel;
             if (noise_level != 0) {
                 // Clear the display area
                 tft.fillRect(0, 40, tftWidth, tftHeight, bruceConfig.bgColor);
@@ -212,7 +212,7 @@ void fm_spectrum() {
 }
 
 bool fm_begin() {
-    if (!radio.begin()) { // begin with address 0x63 (CS high default)
+    if (!fm_radio.begin()) { // begin with address 0x63 (CS high default)
         tft.fillScreen(bruceConfig.bgColor);
         Serial.println("Cannot find radio");
         displayTextLine("Cannot find radio", true);
@@ -247,7 +247,7 @@ bool fm_setup(bool traffic_alert, bool silent) {
         tft.print("\n TX power: ");
         tft.println(tx_power);
     }
-    radio.setTXpower(tx_power); // dBuV, 88-115 max
+    fm_radio.setTXpower(tx_power); // dBuV, 88-115 max
 
     if (!silent) {
         Serial.print("Tuning: ");
@@ -263,16 +263,16 @@ bool fm_setup(bool traffic_alert, bool silent) {
         tft.println(" MHz");
     }
 
-    radio.tuneFM(fm_station); // Specified frequency
+    fm_radio.tuneFM(fm_station); // Specified frequency
 
     // Begin the RDS/RDBS transmission
-    radio.beginRDS();
+    fm_radio.beginRDS();
     if (traffic_alert) {
-        radio.setRDSstation("BruceTraffic");
-        radio.setRDSbuffer("Traffic Info");
+        fm_radio.setRDSstation("BruceTraffic");
+        fm_radio.setRDSbuffer("Traffic Info");
     } else {
-        radio.setRDSstation("BruceRadio");
-        radio.setRDSbuffer("Pwned by Bruce Radio!");
+        fm_radio.setRDSstation("BruceRadio");
+        fm_radio.setRDSbuffer("Pwned by Bruce Radio!");
     }
 
     if (!silent) {
@@ -285,10 +285,10 @@ bool fm_setup(bool traffic_alert, bool silent) {
             Serial.println("TA on!");
             tft.println(" TA on!");
         }
-        radio.setProperty(SI4713_PROP_TX_RDS_PS_MISC, 0x1018);
+        fm_radio.setProperty(SI4713_PROP_TX_RDS_PS_MISC, 0x1018);
     } else {
         // Default value
-        radio.setProperty(SI4713_PROP_TX_RDS_PS_MISC, 0x1008);
+        fm_radio.setProperty(SI4713_PROP_TX_RDS_PS_MISC, 0x1008);
     }
 
     delay(1000);
@@ -298,8 +298,8 @@ bool fm_setup(bool traffic_alert, bool silent) {
 void fm_stop() {
     if (is_running) {
         // Stop radio
-        radio.setTXpower(0); // dBuV
-        radio.reset();
+        fm_radio.setTXpower(0); // dBuV
+        fm_radio.reset();
         is_running = false;
     }
 }
